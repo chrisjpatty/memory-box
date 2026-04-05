@@ -46,6 +46,30 @@ describe('memories routes', () => {
     mockStorage.reset();
   });
 
+  describe('GET /', () => {
+    test('returns paginated memory list', async () => {
+      mockPool.memories.set('test-1', {
+        ...sampleMemory,
+        id: 'test-1',
+        title: 'Memory One',
+      } as any);
+
+      const res = await memories.request('/');
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.memories).toBeDefined();
+      expect(Array.isArray(body.memories)).toBe(true);
+      expect(body.total).toBeDefined();
+    });
+
+    test('returns empty list when no memories', async () => {
+      const res = await memories.request('/');
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.memories).toEqual([]);
+    });
+  });
+
   describe('GET /:id', () => {
     test('returns memory detail', async () => {
       mockPool.memories.set(sampleMemory.id, sampleMemory as any);
@@ -85,6 +109,11 @@ describe('memories routes', () => {
     test('memory without HTML → 404', async () => {
       mockPool.memories.set(sampleMemory.id, sampleMemory as any);
       const res = await memories.request(`/${sampleMemory.id}/html`);
+      expect(res.status).toBe(404);
+    });
+
+    test('nonexistent memory → 404', async () => {
+      const res = await memories.request('/nonexistent/html');
       expect(res.status).toBe(404);
     });
   });
