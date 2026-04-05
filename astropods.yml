@@ -30,13 +30,10 @@ models:
 knowledge:
   db:
     container:
-      image: pgvector/pgvector:pg17
+      build:
+        context: .
+        dockerfile: postgres.Dockerfile
       port: 5432
-      env:
-        POSTGRES_DB: memory_box
-        POSTGRES_USER: postgres
-        POSTGRES_PASSWORD: postgres
-    persistent: true
   files:
     container:
       build:

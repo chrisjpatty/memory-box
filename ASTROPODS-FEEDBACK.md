@@ -1,0 +1,227 @@
+# Astropods CLI Feedback: Custom Knowledge Containers & Persistence
+
+## Context
+
+While re-architecting memory-box to replace the built-in Qdrant/Redis/Neo4j knowledge providers with a single PostgreSQL + pgvector instance, I ran into several friction points with the Astropods spec and CLI around custom knowledge containers. This document captures what I expected vs what happened, intended as actionable feedback for improving the CLI.
+
+---
+
+## 1. Persistence for Custom Knowledge Containers
+
+### What I wanted to do
+Define a custom PostgreSQL container as a knowledge store with persistent data across `ast dev` restarts, the same way built-in providers work:
+
+```yaml
+knowledge:
+  db:
+    provider: qdrant       # ← this gets persistent: true for free
+    persistent: true       # ← works perfectly
+```
+
+Replace with:
+
+```yaml
+knowledge:
+  db:
+    container:
+      image: pgvector/pgvector:pg17
+      port: 5432
+      environment:
+        POSTGRES_DB: memory_box
+    persistent: true
+```
+
+### What happened
+```
+failed to start services: Error response from daemon: invalid volume specification:
+'knowledge-db-data::rw': invalid mount config for type "volume": field Target must not be empty
+```
+
+Astropods correctly creates a named Docker volume (`knowledge-db-data`) but doesn't know where to mount it inside the container. For built-in providers (Qdrant, Redis, Neo4j), Astropods presumably hardcodes the mount target (e.g., `/qdrant/storage`, `/data`). For custom containers, there's no way to specify it.
+
+### What I expected
+I expected one of these to work:
+
+**Option A — Explicit volume target on the knowledge entry:**
+```yaml
+knowledge:
+  db:
+    container:
+      image: pgvector/pgvector:pg17
+      port: 5432
+    persistent: true
+    volume: /var/lib/postgresql/data    # mount target for the named volume
+```
+
+**Option B — Volume target on the container:**
+```yaml
+knowledge:
+  db:
+    container:
+      image: pgvector/pgvector:pg17
+      port: 5432
+      volume: /var/lib/postgresql/data  # ← currently rejected by schema validation
+    persistent: true
+```
+
+**Option C — Auto-detect from image VOLUME declarations:**
+Docker images declare their volumes (e.g., the postgres image declares `VOLUME /var/lib/postgresql/data`). Astropods could inspect the image metadata and use the first declared volume as the mount target. This would make `persistent: true` "just work" for any standard database image.
+
+### What I tried as workarounds
+
+1. **`volume` inside `container` block** — Schema validation rejects it: `additional properties 'volume' not allowed`
+2. **`persistent: true` at container level instead of knowledge level** — Schema accepts it, but same Docker error at runtime
+3. **Custom Dockerfile with `VOLUME` declaration, no `persistent` flag** — Container starts, but data is lost on `ast dev` restart because Astropods recreates the container with a new anonymous volume
+4. **Using `image` instead of `build` with `persistent: true` at knowledge level** — Not yet confirmed if this works (testing)
+
+### Suggested fix
+Add a `volume` (or `volumes`) property to the container schema that specifies the mount target path(s) for persistent data. When `persistent: true` is set, Astropods would mount its named volume (`knowledge-{name}-data`) at the specified path.
+
+```yaml
+# Proposed syntax
+knowledge:
+  db:
+    container:
+      image: pgvector/pgvector:pg17
+      port: 5432
+      volume: /var/lib/postgresql/data   # where to mount the persistent volume
+    persistent: true
+```
+
+Alternatively, auto-detect from the image's VOLUME declarations so no extra config is needed. This would make the UX identical to built-in providers.
+
+---
+
+## 2. `environment` vs `inputs` for Container Env Vars
+
+### What happened
+The container schema includes an `environment` property, but the Astropods convention for injecting env vars into containers is through `inputs` arrays at the knowledge entry level. I initially used `environment` on the container (Docker Compose convention), then `env` (shorthand convention). Neither is the Astropods way.
+
+The correct approach is:
+```yaml
+knowledge:
+  db:
+    container:
+      image: pgvector/pgvector:pg17
+      port: 5432
+    inputs:
+      - name: POSTGRES_DB
+        datatype: string
+        default: memory_box
+```
+
+### What I expected
+Since `environment` exists in the container schema, I expected it to work like Docker Compose's `environment` block. The distinction between `environment` (on container) and `inputs` (on knowledge entry) is not documented and was confusing.
+
+### Suggested fix
+1. Document when to use `inputs` vs `environment` — are they different? Does `environment` actually work, or is it vestigial in the schema?
+2. If `environment` on containers is not the intended mechanism, consider removing it from the schema or adding a validation hint: "Use 'inputs' at the knowledge entry level instead of 'environment' on the container."
+3. Add examples of `inputs` on knowledge entries in `ast docs`.
+
+---
+
+## 3. Environment Variable Naming for Custom Knowledge Containers
+
+### What happened
+For built-in providers, Astropods injects predictably named env vars:
+- `QDRANT_HOST`, `QDRANT_PORT`, `QDRANT_URL`
+- `REDIS_HOST`, `REDIS_PORT`, `REDIS_URL`
+- `NEO4J_HOST`, `NEO4J_PORT`, `NEO4J_URL`
+
+For my custom container named `db`, I had to guess what env vars would be injected. I assumed `DB_HOST`/`DB_PORT` following the pattern, but this isn't documented.
+
+### What I expected
+- Documentation of the env var naming convention for custom knowledge containers: `{UPPER_SNAKE_NAME}_HOST`, `{UPPER_SNAKE_NAME}_PORT`, `{UPPER_SNAKE_NAME}_URL`
+- Or: a way to see what env vars are injected, e.g., `ast dev env` command that prints all injected variables
+
+### Suggested fix
+1. Document the naming convention in `ast docs agent`
+2. Consider adding `ast dev env` to print all injected environment variables
+3. Optionally allow explicit env var mapping in the spec:
+```yaml
+knowledge:
+  db:
+    container:
+      image: pgvector/pgvector:pg17
+      port: 5432
+    env_prefix: POSTGRES   # → injects POSTGRES_HOST, POSTGRES_PORT, POSTGRES_URL
+```
+
+---
+
+## 4. `ast docs` Coverage
+
+### What happened
+`ast docs agent` covers quick start, tools, project structure, and packages. `ast docs help` covers CLI commands. Neither covers the `knowledge` section of the spec in any detail — no examples of custom containers, persistence, environment variables, or the container schema properties.
+
+### What I expected
+A section in `ast docs` covering:
+- Built-in knowledge providers and their env vars
+- How to use custom container images as knowledge stores
+- How persistence works (named volumes, data retention)
+- The complete container schema (image, build, port, environment, healthcheck, persistent, gpu)
+- How env vars are injected for each knowledge entry
+
+### Suggested fix
+Add an `ast docs knowledge` section (or expand `ast docs agent`) with examples like:
+
+```
+## Knowledge Stores
+
+Knowledge entries define sidecar databases for your agent.
+
+### Built-in providers
+  knowledge:
+    vectors:
+      provider: qdrant
+      persistent: true    # data survives ast dev restart
+
+### Custom containers
+  knowledge:
+    db:
+      container:
+        image: pgvector/pgvector:pg17
+        port: 5432
+        volume: /var/lib/postgresql/data
+      persistent: true
+      inputs:
+        - name: POSTGRES_DB
+          datatype: string
+          default: my_db
+
+### Environment variables
+Each knowledge entry injects HOST/PORT/URL vars into the agent:
+  - knowledge.db → DB_HOST, DB_PORT, DB_URL
+  - knowledge.cache → CACHE_HOST, CACHE_PORT, CACHE_URL
+```
+
+---
+
+## 5. Schema Validation UX
+
+### What happened
+`ast validate` correctly caught the invalid `volume` property. However, `ast dev` gave a Docker-level error instead of catching the issue at validation time. The Docker error (`invalid volume specification: 'knowledge-db-data::rw'`) is cryptic and doesn't point to the astropods.yml config as the root cause.
+
+### What I expected
+`ast dev` should run schema validation before generating Docker Compose and show a user-friendly error:
+
+```
+✗ knowledge.db: persistent: true requires a volume mount path for custom containers.
+  Add 'volume: /path/to/data' to the container configuration.
+```
+
+### Suggested fix
+Run `ast validate` as part of `ast dev` startup (before Docker Compose generation). If validation passes but the generated compose is invalid (e.g., empty volume target), catch that at generation time with a descriptive error rather than passing it through to Docker.
+
+---
+
+## Summary of Suggested Improvements
+
+| Priority | Area | Suggestion |
+|----------|------|------------|
+| High | Persistence | Add `volume` property to container schema for custom persistent containers |
+| High | Docs | Add `ast docs knowledge` with custom container + persistence examples |
+| Medium | DX | Run validation before Docker Compose generation in `ast dev` |
+| Medium | DX | Add `ast dev env` to show injected environment variables |
+| Low | DX | Clarify `environment` vs `inputs` — document when to use each, or remove `environment` from schema if `inputs` is the intended mechanism |
+| Low | DX | Support `env_prefix` for custom env var naming |

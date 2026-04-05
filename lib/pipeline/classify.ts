@@ -9,7 +9,10 @@ import type { ClassificationResult, ContentType } from '../types';
 const classificationSchema = z.object({
   contentType: z.enum(['text', 'url', 'image', 'pdf', 'file']),
   title: z.string().describe('A concise, descriptive title for this content'),
-  tags: z.array(z.string()).describe('3-7 relevant tags for categorization'),
+  tags: z.preprocess(
+    (val) => typeof val === 'string' ? val.split(',').map((s: string) => s.trim()).filter(Boolean) : val,
+    z.array(z.string()),
+  ).describe('3-7 relevant tags for categorization'),
   category: z.string().describe('A category like: note, article, bookmark, recipe, reference, reminder, quote, contact, idea, document, report, code'),
   summary: z.string().describe('A 1-2 sentence summary of the content'),
   metadata: z.record(z.string()).describe('Any additional structured metadata extracted from the content'),
