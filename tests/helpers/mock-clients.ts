@@ -1,277 +1,277 @@
 /**
- * In-memory mock implementations of database clients for testing.
- * Mocks: Redis, Qdrant, Neo4j, MinIO storage.
+ * In-memory mock PostgreSQL pool for testing.
+ * Intercepts pool.query() calls and routes to in-memory data structures.
  */
 import { mock } from 'bun:test';
 
-// --- Mock Redis ---
-
-export function createMockRedis() {
-  const store = new Map<string, string>();
-  const hashes = new Map<string, Map<string, string>>();
-  const ttls = new Map<string, number>();
-
-  return {
-    store,
-    hashes,
-    reset() {
-      store.clear();
-      hashes.clear();
-      ttls.clear();
-    },
-    instance: {
-      get: mock(async (key: string) => store.get(key) || null),
-      set: mock(async (key: string, value: string, ...args: any[]) => {
-        store.set(key, value);
-        if (args[0] === 'EX' && args[1]) {
-          ttls.set(key, args[1]);
-        }
-        return 'OK';
-      }),
-      del: mock(async (...keys: string[]) => {
-        let count = 0;
-        for (const key of keys) {
-          if (store.has(key)) { store.delete(key); count++; }
-          if (hashes.has(key)) { hashes.delete(key); count++; }
-        }
-        return count;
-      }),
-      incr: mock(async (key: string) => {
-        const val = parseInt(store.get(key) || '0') + 1;
-        store.set(key, String(val));
-        return val;
-      }),
-      expire: mock(async (key: string, seconds: number) => {
-        ttls.set(key, seconds);
-        return 1;
-      }),
-      ttl: mock(async (key: string) => ttls.get(key) ?? -1),
-      hset: mock(async (key: string, ...args: any[]) => {
-        if (!hashes.has(key)) hashes.set(key, new Map());
-        const h = hashes.get(key)!;
-        if (args.length === 1 && typeof args[0] === 'object') {
-          for (const [k, v] of Object.entries(args[0])) {
-            h.set(k, String(v));
-          }
-        } else if (args.length === 2) {
-          h.set(args[0], String(args[1]));
-        }
-        return 1;
-      }),
-      hget: mock(async (key: string, field: string) => {
-        return hashes.get(key)?.get(field) || null;
-      }),
-      hgetall: mock(async (key: string) => {
-        const h = hashes.get(key);
-        if (!h || h.size === 0) return {};
-        const obj: Record<string, string> = {};
-        h.forEach((v, k) => { obj[k] = v; });
-        return obj;
-      }),
-      hincrby: mock(async (key: string, field: string, increment: number) => {
-        if (!hashes.has(key)) hashes.set(key, new Map());
-        const h = hashes.get(key)!;
-        const val = parseInt(h.get(field) || '0') + increment;
-        h.set(field, String(val));
-        return val;
-      }),
-      scan: mock(async (cursor: string, ...args: any[]) => {
-        // Simple mock: return all matching keys in one batch
-        const matchIdx = args.indexOf('MATCH');
-        const pattern = matchIdx >= 0 ? args[matchIdx + 1] : '*';
-        const prefix = pattern.replace('*', '');
-        const keys = [...store.keys()].filter((k) => k.startsWith(prefix));
-        return ['0', keys];
-      }),
-    },
-  };
+interface MockMemory {
+  id: string;
+  content_type: string;
+  title: string;
+  tags: string[];
+  category: string;
+  summary: string;
+  raw_content: string;
+  processed_content: string;
+  search_content: string;
+  markdown: string | null;
+  source_url: string | null;
+  content_hash: string | null;
+  file_key: string | null;
+  mime_type: string | null;
+  has_html: boolean;
+  metadata: any;
+  created_at: string;
+  updated_at: string;
 }
 
-// --- Mock Qdrant ---
+export function createMockPool() {
+  const memories = new Map<string, MockMemory>();
+  const chunks: Array<{ memory_id: string; chunk_index: number; text: string; embedding: number[] }> = [];
+  const authTokens: Array<{ token_hash: string; hint: string; active: boolean }> = [];
+  const sessions = new Map<string, { id: string; expires_at: string }>();
+  const jobs = new Map<string, any>();
+  const settings = new Map<string, string>();
 
-export function createMockQdrant() {
-  const vectors: Array<{ id: string; vector: number[]; metadata: any }> = [];
-  let indexCreated = false;
+  const queryFn = mock(async (text: string, params?: any[]) => {
+    const sql = text.trim().toLowerCase();
+    const p = params || [];
 
-  return {
-    vectors,
-    reset() {
-      vectors.length = 0;
-      indexCreated = false;
-    },
-    instance: {
-      createIndex: mock(async () => { indexCreated = true; }),
-      upsert: mock(async ({ vectors: vecs, metadata }: any) => {
-        for (let i = 0; i < vecs.length; i++) {
-          vectors.push({
-            id: `${Date.now()}-${i}`,
-            vector: vecs[i],
-            metadata: metadata[i],
-          });
+    // --- memories ---
+    if (sql.includes('insert into memories')) {
+      const mem: MockMemory = {
+        id: p[0], content_type: p[1], title: p[2], tags: p[3] || [],
+        category: p[4], summary: p[5], raw_content: p[6] || '',
+        processed_content: p[7] || '', search_content: p[8] || '',
+        markdown: p[9], source_url: p[10], content_hash: p[11],
+        file_key: p[12], mime_type: p[13], has_html: p[14] || false,
+        metadata: p[15] ? JSON.parse(p[15]) : {}, created_at: p[16] || new Date().toISOString(),
+        updated_at: p[16] || new Date().toISOString(),
+      };
+      // Check unique constraints
+      if (mem.content_hash) {
+        for (const existing of memories.values()) {
+          if (existing.content_hash === mem.content_hash) return { rows: [], rowCount: 0 };
         }
-      }),
-      query: mock(async ({ topK }: any) => {
-        return vectors.slice(0, topK).map((v, i) => ({
-          id: v.id,
-          score: 1 - i * 0.1,
-          metadata: v.metadata,
-        }));
-      }),
-      deleteVectors: mock(async ({ filter }: any) => {
-        const memoryId = filter?.memoryId;
-        if (memoryId) {
-          const toRemove = vectors.filter((v) => v.metadata?.memoryId === memoryId);
-          for (const v of toRemove) {
-            const idx = vectors.indexOf(v);
-            if (idx >= 0) vectors.splice(idx, 1);
-          }
+      }
+      if (mem.source_url) {
+        for (const existing of memories.values()) {
+          if (existing.source_url === mem.source_url) return { rows: [], rowCount: 0 };
         }
-      }),
-      deleteIndex: mock(async () => {
-        vectors.length = 0;
-        indexCreated = false;
-      }),
-    },
-  };
-}
+      }
+      memories.set(mem.id, mem);
+      return { rows: [mem], rowCount: 1 };
+    }
 
-// --- Mock Neo4j ---
+    if (sql.includes('select') && sql.includes('from memories') && sql.includes('where id =')) {
+      const id = p[0];
+      const mem = memories.get(id);
+      return { rows: mem ? [mem] : [], rowCount: mem ? 1 : 0 };
+    }
 
-export function createMockNeo4j() {
-  const memories: Map<string, any> = new Map();
-  const tags: Map<string, Set<string>> = new Map(); // memoryId -> tags
-  const queries: Array<{ query: string; params: any }> = [];
+    if (sql.includes('select') && sql.includes('from memories') && sql.includes('content_hash =')) {
+      const hash = p[0];
+      for (const mem of memories.values()) {
+        if (mem.content_hash === hash) return { rows: [{ id: mem.id }], rowCount: 1 };
+      }
+      return { rows: [], rowCount: 0 };
+    }
 
-  function toNeo4jInt(n: number) {
-    return { toNumber: () => n };
-  }
+    if (sql.includes('select') && sql.includes('from memories') && sql.includes('source_url =')) {
+      const url = p[0];
+      for (const mem of memories.values()) {
+        if (mem.source_url === url) return { rows: [{ id: mem.id }], rowCount: 1 };
+      }
+      return { rows: [], rowCount: 0 };
+    }
+
+    if (sql.includes('delete from memories')) {
+      const id = p[0];
+      memories.delete(id);
+      // CASCADE: remove chunks
+      for (let i = chunks.length - 1; i >= 0; i--) {
+        if (chunks[i].memory_id === id) chunks.splice(i, 1);
+      }
+      return { rows: [], rowCount: 1 };
+    }
+
+    if (sql.includes('select') && sql.includes('from memories') && sql.includes('order by')) {
+      const allMems = [...memories.values()].sort((a, b) => b.created_at.localeCompare(a.created_at));
+      return { rows: allMems, rowCount: allMems.length };
+    }
+
+    if (sql.includes('select') && sql.includes('from memories') && !sql.includes('where')) {
+      return { rows: [...memories.values()], rowCount: memories.size };
+    }
+
+    // --- memory_chunks ---
+    if (sql.includes('insert into memory_chunks')) {
+      chunks.push({ memory_id: p[0], chunk_index: p[1], text: p[2], embedding: p[3] });
+      return { rows: [], rowCount: 1 };
+    }
+
+    if (sql.includes('delete from memory_chunks')) {
+      const memId = p[0];
+      for (let i = chunks.length - 1; i >= 0; i--) {
+        if (chunks[i].memory_id === memId) chunks.splice(i, 1);
+      }
+      return { rows: [], rowCount: 0 };
+    }
+
+    // Vector search mock: return chunks sorted by index
+    if (sql.includes('memory_chunks') && sql.includes('<=>')) {
+      const limit = p[1] || 10;
+      const results = chunks.slice(0, limit).map((c) => ({
+        memory_id: c.memory_id,
+        snippet: c.text,
+        score: 0.9,
+        ...memories.get(c.memory_id),
+      }));
+      return { rows: results, rowCount: results.length };
+    }
+
+    // --- auth_tokens ---
+    if (sql.includes('insert into auth_tokens')) {
+      authTokens.push({ token_hash: p[0], hint: p[1], active: true });
+      return { rows: [], rowCount: 1 };
+    }
+
+    if (sql.includes('update auth_tokens') && sql.includes('active = false')) {
+      for (const t of authTokens) t.active = false;
+      return { rows: [], rowCount: authTokens.length };
+    }
+
+    if (sql.includes('select') && sql.includes('auth_tokens') && sql.includes('token_hash')) {
+      const hash = p[0];
+      const found = authTokens.find((t) => t.token_hash === hash && t.active);
+      return { rows: found ? [found] : [], rowCount: found ? 1 : 0 };
+    }
+
+    if (sql.includes('select') && sql.includes('auth_tokens') && sql.includes('active = true')) {
+      const found = authTokens.find((t) => t.active);
+      return { rows: found ? [found] : [], rowCount: found ? 1 : 0 };
+    }
+
+    if (sql.includes('select') && sql.includes('hint') && sql.includes('auth_tokens')) {
+      const found = authTokens.find((t) => t.active);
+      return { rows: found ? [{ hint: found.hint }] : [], rowCount: found ? 1 : 0 };
+    }
+
+    // --- sessions ---
+    if (sql.includes('insert into sessions')) {
+      sessions.set(p[0], { id: p[0], expires_at: p[1] });
+      return { rows: [], rowCount: 1 };
+    }
+
+    if (sql.includes('select') && sql.includes('sessions') && sql.includes('where id =')) {
+      const sess = sessions.get(p[0]);
+      if (sess && new Date(sess.expires_at) > new Date()) {
+        return { rows: [sess], rowCount: 1 };
+      }
+      return { rows: [], rowCount: 0 };
+    }
+
+    if (sql.includes('delete from sessions')) {
+      if (p[0]) sessions.delete(p[0]);
+      return { rows: [], rowCount: 1 };
+    }
+
+    // --- jobs ---
+    if (sql.includes('insert into jobs')) {
+      const job = { id: p[0], type: p[1], status: 'running', total: 0, completed: 0, skipped: 0, failed: 0 };
+      jobs.set(p[0], job);
+      return { rows: [job], rowCount: 1 };
+    }
+
+    if (sql.includes('select') && sql.includes('from jobs') && sql.includes('where id =')) {
+      const job = jobs.get(p[0]);
+      return { rows: job ? [job] : [], rowCount: job ? 1 : 0 };
+    }
+
+    // --- settings ---
+    if (sql.includes('insert into settings') || sql.includes('on conflict')) {
+      settings.set(p[0], p[1]);
+      return { rows: [], rowCount: 1 };
+    }
+
+    if (sql.includes('select') && sql.includes('settings') && sql.includes('where key =')) {
+      const val = settings.get(p[0]);
+      return { rows: val !== undefined ? [{ key: p[0], value: val }] : [], rowCount: val !== undefined ? 1 : 0 };
+    }
+
+    if (sql.includes('delete from settings')) {
+      if (sql.includes('in')) {
+        // DELETE FROM settings WHERE key IN (...)
+        for (const k of p) settings.delete(k);
+      } else {
+        settings.delete(p[0]);
+      }
+      return { rows: [], rowCount: 1 };
+    }
+
+    // Stats queries
+    if (sql.includes('count(*)') && sql.includes('memories')) {
+      const tagSet = new Set<string>();
+      const catSet = new Set<string>();
+      for (const m of memories.values()) {
+        m.tags.forEach((t: string) => tagSet.add(t));
+        if (m.category) catSet.add(m.category);
+      }
+      return { rows: [{ memories: memories.size, tags: tagSet.size, categories: catSet.size }], rowCount: 1 };
+    }
+
+    // Fulltext search mock
+    if (sql.includes('search_vector') && sql.includes('@@')) {
+      return { rows: [...memories.values()].slice(0, p[1] || 5).map((m, i) => ({
+        memory_id: m.id, title: m.title, content_type: m.content_type,
+        summary: m.summary, tags: m.tags, category: m.category,
+        created_at: m.created_at, source_url: m.source_url,
+        snippet: m.processed_content?.slice(0, 300) || '', score: 1 - i * 0.1,
+      })), rowCount: 0 };
+    }
+
+    // Schema init (CREATE TABLE, CREATE INDEX, etc.)
+    if (sql.includes('create') || sql.includes('drop') || sql.includes('extension')) {
+      return { rows: [], rowCount: 0 };
+    }
+
+    // Default: empty result
+    return { rows: [], rowCount: 0 };
+  });
 
   return {
     memories,
-    tags,
-    queries,
+    chunks,
+    authTokens,
+    sessions,
+    jobs,
+    settings,
     reset() {
       memories.clear();
-      tags.clear();
-      queries.length = 0;
+      chunks.length = 0;
+      authTokens.length = 0;
+      sessions.clear();
+      jobs.clear();
+      settings.clear();
     },
     instance: {
-      session: () => ({
-        run: mock(async (query: string, params?: any) => {
-          queries.push({ query, params });
-
-          // Handle Memory list query
-          if (query.includes('RETURN m ORDER BY')) {
-            const skip = typeof params?.skip === 'object' ? Number(params.skip) : (params?.skip || 0);
-            const limit = typeof params?.limit === 'object' ? Number(params.limit) : (params?.limit || 20);
-            const records = [...memories.values()]
-              .sort((a, b) => b.createdAt?.localeCompare?.(a.createdAt) || 0)
-              .slice(skip, skip + limit)
-              .map((m) => ({
-                get: (field: string) => {
-                  if (field === 'm') return { properties: m };
-                  return m[field];
-                },
-              }));
-            return { records };
-          }
-
-          // Handle count query
-          if (query.includes('count(m) as total')) {
-            return {
-              records: [{
-                get: (field: string) => {
-                  if (field === 'total') return toNeo4jInt(memories.size);
-                  return toNeo4jInt(0);
-                },
-              }],
-            };
-          }
-
-          // Handle stats query
-          if (query.includes('count(c) AS categories')) {
-            const allTags = new Set<string>();
-            tags.forEach((t) => t.forEach((tag) => allTags.add(tag)));
-            const allCategories = new Set<string>();
-            memories.forEach((m) => { if (m.category) allCategories.add(m.category); });
-            return {
-              records: [{
-                get: (field: string) => {
-                  if (field === 'memories') return toNeo4jInt(memories.size);
-                  if (field === 'tags') return toNeo4jInt(allTags.size);
-                  if (field === 'categories') return toNeo4jInt(allCategories.size);
-                  return toNeo4jInt(0);
-                },
-              }],
-            };
-          }
-
-          // Handle MERGE (upsert from ingest)
-          if (query.includes('MERGE (m:Memory')) {
-            if (params?.id) {
-              memories.set(params.id, {
-                id: params.id,
-                title: params.title,
-                contentType: params.contentType,
-                category: params.category,
-                createdAt: params.createdAt,
-                summary: params.summary,
-                searchContent: params.searchContent,
-              });
-              if (params.tags) {
-                tags.set(params.id, new Set(params.tags));
-              }
-            }
-            return { records: [] };
-          }
-
-          // Handle DELETE
-          if (query.includes('DETACH DELETE')) {
-            if (params?.id) {
-              memories.delete(params.id);
-              tags.delete(params.id);
-            }
-            return { records: [] };
-          }
-
-          // Handle fulltext index creation
-          if (query.includes('CREATE FULLTEXT INDEX')) {
-            return { records: [] };
-          }
-
-          // Handle fulltext search
-          if (query.includes('db.index.fulltext.queryNodes')) {
-            const results = [...memories.values()].slice(0, params?.limit || 5);
-            return {
-              records: results.map((m, i) => ({
-                get: (field: string) => {
-                  if (field === 'm') return { properties: m };
-                  if (field === 'score') return 1 - i * 0.1;
-                  if (field === 'tags') return [...(tags.get(m.id) || [])];
-                  return null;
-                },
-              })),
-            };
-          }
-
-          return { records: [] };
-        }),
-        close: mock(async () => {}),
-      }),
+      query: queryFn,
+      connect: mock(async () => ({
+        query: queryFn,
+        release: mock(() => {}),
+      })),
     },
   };
 }
 
-// --- Mock Storage (MinIO) ---
+// --- Mock Storage (MinIO) --- kept from original
 
 export function createMockStorage() {
   const files = new Map<string, { data: Buffer; contentType: string }>();
 
   return {
     files,
-    reset() {
-      files.clear();
-    },
+    reset() { files.clear(); },
     putFile: mock(async (key: string, data: Buffer, contentType: string) => {
       files.set(key, { data, contentType });
     }),

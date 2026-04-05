@@ -20,23 +20,23 @@
     "@mastra/memory": "latest",
     "@mastra/observability": "latest",
     "@mastra/otel-exporter": "latest",
-    "@mastra/qdrant": "latest",
     "@mastra/rag": "latest",
     "@opentelemetry/exporter-trace-otlp-proto": "latest",
     "ai": "latest",
     "cheerio": "^1",
     "hono": "^4",
-    "ioredis": "^5",
     "nanoid": "^5",
-    "neo4j-driver": "^5",
     "ollama-ai-provider": "^1.2.0",
     "pdf-parse": "^2.4.5",
+    "pg": "^8.20.0",
+    "pgvector": "^0.2.1",
     "sharp": "^0.34.5",
     "turndown": "^7",
     "zod": "^3"
   },
   "devDependencies": {
     "@types/bun": "^1.1.14",
+    "@types/pg": "^8.20.0",
     "@types/turndown": "^5",
     "typescript": "^5.9.3"
   }

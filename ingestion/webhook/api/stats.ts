@@ -1,31 +1,23 @@
 import { Hono } from 'hono';
-import { getNeo4j } from '../../../lib/clients';
-import neo4j from 'neo4j-driver';
+import { query } from '../../../lib/db';
 
 const stats = new Hono();
 
 stats.get('/', async (c) => {
   try {
-    const driver = getNeo4j();
-    const session = driver.session();
-    try {
-      const result = await session.run(`
-        OPTIONAL MATCH (m:Memory)
-        WITH count(m) AS memories
-        OPTIONAL MATCH (t:Tag)
-        WITH memories, count(t) AS tags
-        OPTIONAL MATCH (c:Category)
-        RETURN memories, tags, count(c) AS categories
-      `);
-      const record = result.records[0];
-      return c.json({
-        memories: record?.get('memories')?.toNumber?.() ?? 0,
-        tags: record?.get('tags')?.toNumber?.() ?? 0,
-        categories: record?.get('categories')?.toNumber?.() ?? 0,
-      });
-    } finally {
-      await session.close();
-    }
+    const result = await query(`
+      SELECT
+        count(*) AS memories,
+        (SELECT count(DISTINCT t) FROM memories, unnest(tags) AS t) AS tags,
+        count(DISTINCT category) AS categories
+      FROM memories
+    `);
+    const row = result.rows[0];
+    return c.json({
+      memories: parseInt(row.memories) || 0,
+      tags: parseInt(row.tags) || 0,
+      categories: parseInt(row.categories) || 0,
+    });
   } catch {
     return c.json({ memories: 0, tags: 0, categories: 0 });
   }

@@ -1,7 +1,7 @@
 import { nanoid } from 'nanoid';
-import { getRedis } from '../clients';
+import { query } from '../db';
 import { ingest } from '../ingest';
-import { githubFetch, GitHubRateLimitError } from '../pipelines/url-handlers/github';
+import { githubFetch, GitHubRateLimitError } from '../pipeline/url-handlers/github';
 import { getGitHubToken } from './token-store';
 
 // --- Discovery ---
@@ -27,7 +27,7 @@ export interface DiscoverResult {
 
 /**
  * Fetch all starred repos for a user, filter out private repos,
- * and check which are already imported via dedup keys.
+ * and check which are already imported via source_url dedup.
  */
 export async function discoverStars(username: string, token?: string): Promise<DiscoverResult> {
   const resolvedToken = token || await getGitHubToken() || undefined;
@@ -56,25 +56,19 @@ export async function discoverStars(username: string, token?: string): Promise<D
     page++;
   }
 
-  // Check dedup for each public repo
-  const redis = getRedis();
+  // Check dedup for each public repo via source_url
   const repos: StarredRepo[] = [];
 
   for (const repo of allRepos) {
     const repoUrl = repo.html_url;
-    const dedupKey = `url-dedup:${repoUrl}`;
-    const existingId = await redis.get(dedupKey);
+    const result = await query('SELECT id FROM memories WHERE source_url = $1', [repoUrl]);
 
     let alreadyImported = false;
     let existingMemoryId: string | undefined;
 
-    if (existingId) {
-      // Verify the memory still exists
-      const memoryData = await redis.get(`memory:${existingId}`);
-      if (memoryData) {
-        alreadyImported = true;
-        existingMemoryId = existingId;
-      }
+    if (result.rows.length > 0) {
+      alreadyImported = true;
+      existingMemoryId = result.rows[0].id;
     }
 
     repos.push({
@@ -122,27 +116,26 @@ export interface ImportJobResult {
 
 /**
  * Process an import job sequentially. Runs as a fire-and-forget async function.
- * Updates Redis job state after each repo so SSE can stream progress.
+ * Updates the jobs table after each repo so SSE can stream progress.
  */
 export async function processImportJob(
   jobId: string,
   repos: string[],
   githubToken?: string,
 ): Promise<void> {
-  const redis = getRedis();
   const hasToken = !!githubToken;
   const delayMs = hasToken ? 200 : 3000;
 
   for (let i = 0; i < repos.length; i++) {
     // Check for cancellation
-    const status = await redis.hget(`import-job:${jobId}`, 'status');
-    if (status === 'cancelled') {
-      await redis.hset(`import-job:${jobId}`, 'completedAt', new Date().toISOString());
+    const statusResult = await query('SELECT status FROM jobs WHERE id = $1', [jobId]);
+    if (statusResult.rows[0]?.status === 'cancelled') {
+      await query('UPDATE jobs SET completed_at = $1 WHERE id = $2', [new Date().toISOString(), jobId]);
       return;
     }
 
     const repoUrl = repos[i];
-    await redis.hset(`import-job:${jobId}`, 'currentRepo', repoUrl);
+    await query('UPDATE jobs SET current_item = $1 WHERE id = $2', [repoUrl, jobId]);
 
     // Temporarily set the GitHub token for the ingest pipeline
     const originalToken = process.env.GITHUB_TOKEN;
@@ -155,21 +148,25 @@ export async function processImportJob(
         ? { repo: repoUrl, status: 'skipped', memoryId: result.existingMemoryId }
         : { repo: repoUrl, status: 'imported', memoryId: result.memoryId };
 
-      await redis.hincrby(`import-job:${jobId}`, 'completed', 1);
+      await query('UPDATE jobs SET completed = completed + 1 WHERE id = $1', [jobId]);
       if (result.deduplicated) {
-        await redis.hincrby(`import-job:${jobId}`, 'skipped', 1);
+        await query('UPDATE jobs SET skipped = skipped + 1 WHERE id = $1', [jobId]);
       }
 
-      // Append result
-      const existingResults = JSON.parse(await redis.hget(`import-job:${jobId}`, 'results') || '[]');
-      existingResults.push(entry);
-      await redis.hset(`import-job:${jobId}`, 'results', JSON.stringify(existingResults));
+      // Append result to the results JSONB array
+      await query(
+        `UPDATE jobs SET results = results || $1::jsonb WHERE id = $2`,
+        [JSON.stringify([entry]), jobId],
+      );
 
     } catch (err: any) {
       // Handle rate limiting: wait and retry this repo
       if (err instanceof GitHubRateLimitError) {
         const waitMs = Math.max(0, err.resetAt * 1000 - Date.now()) + 1000;
-        await redis.hset(`import-job:${jobId}`, 'currentRepo', `Rate limited — resuming in ${Math.ceil(waitMs / 1000)}s`);
+        await query('UPDATE jobs SET current_item = $1 WHERE id = $2', [
+          `Rate limited — resuming in ${Math.ceil(waitMs / 1000)}s`,
+          jobId,
+        ]);
         await new Promise((resolve) => setTimeout(resolve, waitMs));
         i--; // Retry this repo
         continue;
@@ -177,12 +174,12 @@ export async function processImportJob(
 
       console.error(`Import failed for ${repoUrl}:`, err.message, err.stack?.split('\n').slice(0, 3).join('\n'));
 
-      await redis.hincrby(`import-job:${jobId}`, 'completed', 1);
-      await redis.hincrby(`import-job:${jobId}`, 'failed', 1);
+      await query('UPDATE jobs SET completed = completed + 1, failed = failed + 1 WHERE id = $1', [jobId]);
 
-      const existingResults = JSON.parse(await redis.hget(`import-job:${jobId}`, 'results') || '[]');
-      existingResults.push({ repo: repoUrl, status: 'failed', error: err.message });
-      await redis.hset(`import-job:${jobId}`, 'results', JSON.stringify(existingResults));
+      await query(
+        `UPDATE jobs SET results = results || $1::jsonb WHERE id = $2`,
+        [JSON.stringify([{ repo: repoUrl, status: 'failed', error: err.message }]), jobId],
+      );
     } finally {
       // Restore original token
       if (githubToken) {
@@ -198,12 +195,10 @@ export async function processImportJob(
   }
 
   // Mark complete
-  await redis.hset(`import-job:${jobId}`, {
-    status: 'completed',
-    completedAt: new Date().toISOString(),
-    currentRepo: '',
-  });
-  await redis.del('active-import-job');
+  await query(
+    `UPDATE jobs SET status = 'completed', completed_at = $1, current_item = '' WHERE id = $2`,
+    [new Date().toISOString(), jobId],
+  );
 }
 
 /**
@@ -211,45 +206,31 @@ export async function processImportJob(
  * Returns the jobId. Throws if an import is already running.
  */
 export async function startImportJob(repos: string[], token?: string): Promise<string> {
-  const redis = getRedis();
   const resolvedToken = token || await getGitHubToken() || undefined;
 
   // Enforce single import at a time
-  const activeJob = await redis.get('active-import-job');
-  if (activeJob) {
-    // Check if it's actually still running
-    const activeStatus = await redis.hget(`import-job:${activeJob}`, 'status');
-    if (activeStatus === 'running') {
-      throw new Error('An import is already in progress');
-    }
-    // Stale key — clean up
-    await redis.del('active-import-job');
+  const activeResult = await query(
+    `SELECT id FROM jobs WHERE type = 'import' AND status = 'running' LIMIT 1`,
+  );
+  if (activeResult.rows.length > 0) {
+    throw new Error('An import is already in progress');
   }
 
   const jobId = nanoid(21);
 
-  await redis.hset(`import-job:${jobId}`, {
-    status: 'running',
-    total: String(repos.length),
-    completed: '0',
-    skipped: '0',
-    failed: '0',
-    currentRepo: '',
-    results: '[]',
-    startedAt: new Date().toISOString(),
-  });
-  await redis.expire(`import-job:${jobId}`, 86400); // 24hr TTL
-  await redis.set('active-import-job', jobId, 'EX', 86400);
+  await query(
+    `INSERT INTO jobs (id, type, status, total, completed, skipped, failed, current_item, results, started_at)
+     VALUES ($1, 'import', 'running', $2, 0, 0, 0, '', '[]'::jsonb, $3)`,
+    [jobId, repos.length, new Date().toISOString()],
+  );
 
   // Fire and forget
   processImportJob(jobId, repos, resolvedToken).catch(async (err) => {
     console.error('Import job failed:', err);
-    await redis.hset(`import-job:${jobId}`, {
-      status: 'failed',
-      error: err.message,
-      completedAt: new Date().toISOString(),
-    });
-    await redis.del('active-import-job');
+    await query(
+      `UPDATE jobs SET status = 'failed', error = $1, completed_at = $2 WHERE id = $3`,
+      [err.message, new Date().toISOString(), jobId],
+    );
   });
 
   return jobId;
@@ -268,8 +249,10 @@ export async function runSyncCheck(): Promise<void> {
   const token = await getGitHubToken();
   if (!token) return;
 
-  const redis = getRedis();
-  const username = await redis.get('github-sync:username');
+  const usernameResult = await query(
+    `SELECT value FROM settings WHERE key = 'github_sync_username'`,
+  );
+  const username = usernameResult.rows[0]?.value;
   if (!username) return;
 
   try {
@@ -287,12 +270,8 @@ export async function runSyncCheck(): Promise<void> {
       const repoUrl = repo.html_url;
 
       // Quick dedup check before calling full ingest
-      const dedupKey = `url-dedup:${repoUrl}`;
-      const existing = await redis.get(dedupKey);
-      if (existing) {
-        const memoryExists = await redis.get(`memory:${existing}`);
-        if (memoryExists) continue;
-      }
+      const existing = await query('SELECT id FROM memories WHERE source_url = $1', [repoUrl]);
+      if (existing.rows.length > 0) continue;
 
       // New public star — ingest it
       const originalToken = process.env.GITHUB_TOKEN;
@@ -310,7 +289,11 @@ export async function runSyncCheck(): Promise<void> {
       await new Promise((resolve) => setTimeout(resolve, 200));
     }
 
-    await redis.set('github-sync:lastCheck', new Date().toISOString());
+    await query(
+      `INSERT INTO settings (key, value) VALUES ('github_sync_last_check', $1)
+       ON CONFLICT (key) DO UPDATE SET value = $1`,
+      [new Date().toISOString()],
+    );
   } catch (err) {
     console.warn('Auto-sync check failed:', err);
   }
@@ -319,9 +302,10 @@ export async function runSyncCheck(): Promise<void> {
 export async function startAutoSync(): Promise<void> {
   if (syncInterval) return;
 
-  const redis = getRedis();
-  const enabled = await redis.get('github-sync:enabled');
-  if (enabled !== 'true') return;
+  const enabledResult = await query(
+    `SELECT value FROM settings WHERE key = 'github_sync_enabled'`,
+  );
+  if (enabledResult.rows[0]?.value !== 'true') return;
 
   const token = await getGitHubToken();
   if (!token) return;
@@ -342,14 +326,18 @@ export async function stopAutoSync(): Promise<void> {
 }
 
 export async function enableAutoSync(): Promise<void> {
-  const redis = getRedis();
-  await redis.set('github-sync:enabled', 'true');
+  await query(
+    `INSERT INTO settings (key, value) VALUES ('github_sync_enabled', 'true')
+     ON CONFLICT (key) DO UPDATE SET value = 'true'`,
+  );
   await startAutoSync();
 }
 
 export async function disableAutoSync(): Promise<void> {
-  const redis = getRedis();
-  await redis.set('github-sync:enabled', 'false');
+  await query(
+    `INSERT INTO settings (key, value) VALUES ('github_sync_enabled', 'false')
+     ON CONFLICT (key) DO UPDATE SET value = 'false'`,
+  );
   await stopAutoSync();
 }
 
@@ -358,9 +346,15 @@ export async function getSyncStatus(): Promise<{
   lastCheck?: string;
   nextCheck?: string;
 }> {
-  const redis = getRedis();
-  const enabled = (await redis.get('github-sync:enabled')) === 'true';
-  const lastCheck = await redis.get('github-sync:lastCheck') || undefined;
+  const enabledResult = await query(
+    `SELECT value FROM settings WHERE key = 'github_sync_enabled'`,
+  );
+  const enabled = enabledResult.rows[0]?.value === 'true';
+
+  const lastCheckResult = await query(
+    `SELECT value FROM settings WHERE key = 'github_sync_last_check'`,
+  );
+  const lastCheck = lastCheckResult.rows[0]?.value || undefined;
 
   let nextCheck: string | undefined;
   if (enabled && lastCheck) {

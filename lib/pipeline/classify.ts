@@ -1,6 +1,10 @@
+/**
+ * AI classification of content for metadata enrichment.
+ * Uses Haiku for fast classification, with a deterministic fallback.
+ */
 import { Agent } from '@mastra/core/agent';
 import { z } from 'zod';
-import type { ClassificationResult, ContentType } from './types';
+import type { ClassificationResult, ContentType } from '../types';
 
 const classificationSchema = z.object({
   contentType: z.enum(['text', 'url', 'image', 'pdf', 'file']),
@@ -68,7 +72,6 @@ ${content.slice(0, 10000)}
   return fallbackClassify(content, userTitle, userTags);
 }
 
-/** @internal Exported for testing. */
 export function fallbackClassify(
   content: string,
   userTitle?: string,

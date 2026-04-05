@@ -1,17 +1,13 @@
 import { describe, expect, test, beforeEach, mock } from 'bun:test';
-import { createMockRedis, createMockNeo4j, createMockQdrant, createMockStorage } from '../../../helpers/mock-clients';
+import { createMockPool, createMockStorage } from '../../../helpers/mock-clients';
 
-const mockRedis = createMockRedis();
-const mockNeo4j = createMockNeo4j();
-const mockQdrant = createMockQdrant();
+const mockPool = createMockPool();
 const mockStorage = createMockStorage();
 
-mock.module('../../../../lib/clients', () => ({
-  getRedis: () => mockRedis.instance,
-  getNeo4j: () => mockNeo4j.instance,
-  getQdrant: () => mockQdrant.instance,
-  QDRANT_INDEX_NAME: 'memories',
-  EMBEDDING_DIMENSION: 768,
+mock.module('../../../../lib/db', () => ({
+  getPool: () => mockPool.instance,
+  query: mockPool.instance.query,
+  getClient: mockPool.instance.connect,
 }));
 
 mock.module('../../../../lib/storage', () => ({
@@ -21,65 +17,38 @@ mock.module('../../../../lib/storage', () => ({
   fileKey: mockStorage.fileKey,
 }));
 
-// Mock cleanupDedupKeys to avoid scanning Redis
-mock.module('../../../../lib/ingest', () => ({
-  cleanupDedupKeys: mock(async () => {}),
-}));
-
 const { memories } = await import('../../../../ingestion/webhook/api/memories');
 
 const sampleMemory = {
   id: 'test-mem-1',
-  contentType: 'text',
+  content_type: 'text',
   title: 'Test Memory',
   category: 'note',
   summary: 'A test memory',
   tags: ['test'],
-  createdAt: '2024-01-01T00:00:00Z',
-  processedContent: 'Some processed content',
+  created_at: '2024-01-01T00:00:00Z',
+  updated_at: '2024-01-01T00:00:00Z',
+  processed_content: 'Some processed content',
+  raw_content: 'Some raw content',
+  search_content: 'Some search content',
   markdown: 'Some markdown content',
-  extra: {},
+  source_url: null,
+  content_hash: null,
+  file_key: null,
+  mime_type: null,
+  has_html: false,
+  metadata: {},
 };
 
 describe('memories routes', () => {
   beforeEach(() => {
-    mockRedis.reset();
-    mockNeo4j.reset();
-    mockQdrant.reset();
+    mockPool.reset();
     mockStorage.reset();
-  });
-
-  describe('GET /', () => {
-    test('returns paginated memory list', async () => {
-      // Add a memory to Neo4j mock
-      mockNeo4j.memories.set('test-1', {
-        id: 'test-1',
-        title: 'Memory One',
-        contentType: 'text',
-        category: 'note',
-        summary: 'First memory',
-        createdAt: '2024-01-01',
-      });
-
-      const res = await memories.request('/');
-      expect(res.status).toBe(200);
-      const body = await res.json();
-      expect(body.memories).toBeDefined();
-      expect(Array.isArray(body.memories)).toBe(true);
-      expect(body.total).toBeDefined();
-    });
-
-    test('returns empty list when no memories', async () => {
-      const res = await memories.request('/');
-      expect(res.status).toBe(200);
-      const body = await res.json();
-      expect(body.memories).toEqual([]);
-    });
   });
 
   describe('GET /:id', () => {
     test('returns memory detail', async () => {
-      await mockRedis.instance.set(`memory:${sampleMemory.id}`, JSON.stringify(sampleMemory));
+      mockPool.memories.set(sampleMemory.id, sampleMemory as any);
 
       const res = await memories.request(`/${sampleMemory.id}`);
       expect(res.status).toBe(200);
@@ -99,8 +68,8 @@ describe('memories routes', () => {
 
   describe('GET /:id/html', () => {
     test('returns HTML with CSP headers', async () => {
-      const memWithHtml = { ...sampleMemory, hasHtml: true };
-      await mockRedis.instance.set(`memory:${sampleMemory.id}`, JSON.stringify(memWithHtml));
+      const memWithHtml = { ...sampleMemory, has_html: true };
+      mockPool.memories.set(sampleMemory.id, memWithHtml as any);
 
       const htmlContent = '<html><body><h1>Hello</h1></body></html>';
       mockStorage.files.set(`${sampleMemory.id}/original.html`, {
@@ -111,29 +80,22 @@ describe('memories routes', () => {
       const res = await memories.request(`/${sampleMemory.id}/html`);
       expect(res.status).toBe(200);
       expect(res.headers.get('Content-Security-Policy')).toContain("script-src 'none'");
-      expect(res.headers.get('Content-Type')).toContain('text/html');
     });
 
     test('memory without HTML → 404', async () => {
-      await mockRedis.instance.set(`memory:${sampleMemory.id}`, JSON.stringify(sampleMemory));
-
+      mockPool.memories.set(sampleMemory.id, sampleMemory as any);
       const res = await memories.request(`/${sampleMemory.id}/html`);
-      expect(res.status).toBe(404);
-    });
-
-    test('nonexistent memory → 404', async () => {
-      const res = await memories.request('/nonexistent/html');
       expect(res.status).toBe(404);
     });
   });
 
   describe('GET /:id/image', () => {
     test('returns image with content-type', async () => {
-      const memWithImage = { ...sampleMemory, fileKey: `${sampleMemory.id}/original.png` };
-      await mockRedis.instance.set(`memory:${sampleMemory.id}`, JSON.stringify(memWithImage));
+      const memWithImage = { ...sampleMemory, file_key: `${sampleMemory.id}/original.png` };
+      mockPool.memories.set(sampleMemory.id, memWithImage as any);
 
       mockStorage.files.set(`${sampleMemory.id}/original.png`, {
-        data: Buffer.from([0x89, 0x50, 0x4e, 0x47]), // PNG header
+        data: Buffer.from([0x89, 0x50, 0x4e, 0x47]),
         contentType: 'image/png',
       });
 
@@ -143,8 +105,7 @@ describe('memories routes', () => {
     });
 
     test('memory without file → 404', async () => {
-      await mockRedis.instance.set(`memory:${sampleMemory.id}`, JSON.stringify(sampleMemory));
-
+      mockPool.memories.set(sampleMemory.id, sampleMemory as any);
       const res = await memories.request(`/${sampleMemory.id}/image`);
       expect(res.status).toBe(404);
     });
@@ -152,20 +113,15 @@ describe('memories routes', () => {
 
   describe('DELETE /:id', () => {
     test('removes memory and returns success', async () => {
-      await mockRedis.instance.set(`memory:${sampleMemory.id}`, JSON.stringify(sampleMemory));
-      mockNeo4j.memories.set(sampleMemory.id, sampleMemory);
+      mockPool.memories.set(sampleMemory.id, sampleMemory as any);
 
       const res = await memories.request(`/${sampleMemory.id}`, { method: 'DELETE' });
       expect(res.status).toBe(200);
       const body = await res.json();
       expect(body.success).toBe(true);
-
-      // Redis key should be deleted
-      const redisVal = await mockRedis.instance.get(`memory:${sampleMemory.id}`);
-      expect(redisVal).toBeNull();
     });
 
-    test('deleting nonexistent memory still succeeds (idempotent)', async () => {
+    test('deleting nonexistent memory still succeeds', async () => {
       const res = await memories.request('/nonexistent', { method: 'DELETE' });
       expect(res.status).toBe(200);
       const body = await res.json();

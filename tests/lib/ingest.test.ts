@@ -6,7 +6,7 @@ import {
   bufferHash,
   classifyImage,
   classifyPdf,
-} from '../../lib/ingest';
+} from '../../lib/pipeline/detect';
 
 describe('detectContentType', () => {
   test('HTTP URL returns url', () => {

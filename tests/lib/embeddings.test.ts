@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { splitOversizedChunks } from '../../lib/embeddings';
+import { splitOversizedChunks } from '../../lib/pipeline/embed';
 
 describe('splitOversizedChunks', () => {
   test('text under maxChars passes through unchanged', () => {

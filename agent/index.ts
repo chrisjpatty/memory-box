@@ -7,20 +7,12 @@
  * Environment variables (automatically injected by 'astro dev'):
  *   ANTHROPIC_API_KEY - injected by anthropic model
  *   GRPC_SERVER_ADDR - injected by Astro messaging service
- *   NEO4J_HOST - injected by neo4j knowledge store host
- *   NEO4J_PORT - injected by neo4j knowledge store port
- *   NEO4J_URL - injected by neo4j knowledge store URL
+ *   DATABASE_URL - PostgreSQL connection string (or POSTGRES_HOST/POSTGRES_PORT)
  *   OLLAMA_BASE_URL - injected by ollama model base URL
  *   OLLAMA_HOST - injected by ollama model host
  *   OLLAMA_MODEL - injected by ollama model model name
  *   OLLAMA_PORT - injected by ollama model port
  *   OLLAMA_URL - injected by ollama model URL
- *   QDRANT_HOST - injected by qdrant knowledge store host
- *   QDRANT_PORT - injected by qdrant knowledge store port
- *   QDRANT_URL - injected by qdrant knowledge store URL
- *   REDIS_HOST - injected by redis knowledge store host
- *   REDIS_PORT - injected by redis knowledge store port
- *   REDIS_URL - injected by redis knowledge store URL
  */
 
 import { Agent } from '@mastra/core/agent';

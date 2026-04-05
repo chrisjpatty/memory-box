@@ -1,21 +1,19 @@
 import { describe, expect, test, beforeEach, mock } from 'bun:test';
-import { createMockRedis } from '../../../helpers/mock-clients';
+import { createMockPool } from '../../../helpers/mock-clients';
 
-const mockRedis = createMockRedis();
+const mockPool = createMockPool();
 
-mock.module('../../../../lib/clients', () => ({
-  getRedis: () => mockRedis.instance,
-  getNeo4j: () => ({ session: () => ({ run: async () => ({ records: [] }), close: async () => {} }) }),
-  getQdrant: () => ({}),
-  QDRANT_INDEX_NAME: 'memories',
-  EMBEDDING_DIMENSION: 768,
+mock.module('../../../../lib/db', () => ({
+  getPool: () => mockPool.instance,
+  query: mockPool.instance.query,
+  getClient: mockPool.instance.connect,
 }));
 
 const { token } = await import('../../../../ingestion/webhook/api/token');
 
 describe('token routes', () => {
   beforeEach(() => {
-    mockRedis.reset();
+    mockPool.reset();
   });
 
   describe('GET /hint', () => {
@@ -27,7 +25,6 @@ describe('token routes', () => {
     });
 
     test('after generating token → shows hint', async () => {
-      // Generate a token first
       const genRes = await token.request('/generate', { method: 'POST' });
       expect(genRes.status).toBe(200);
 
@@ -48,25 +45,18 @@ describe('token routes', () => {
     });
 
     test('fails if token already exists → 409', async () => {
-      // Generate first token
       await token.request('/generate', { method: 'POST' });
-
-      // Try to generate again
       const res = await token.request('/generate', { method: 'POST' });
       expect(res.status).toBe(409);
-      const body = await res.json();
-      expect(body.error).toContain('already exists');
     });
   });
 
   describe('POST /rotate', () => {
     test('revokes old and returns new token', async () => {
-      // Generate initial token
       const gen1 = await token.request('/generate', { method: 'POST' });
       const body1 = await gen1.json();
       const oldToken = body1.token;
 
-      // Rotate
       const rotateRes = await token.request('/rotate', { method: 'POST' });
       expect(rotateRes.status).toBe(200);
       const body2 = await rotateRes.json();

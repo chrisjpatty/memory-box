@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { detectMimeType } from '../../../lib/pipelines/image';
+import { detectMimeType } from '../../../lib/pipeline/detect';
 
 describe('detectMimeType', () => {
   test('PNG magic bytes → image/png', () => {

@@ -1,7 +1,6 @@
 import { createTool } from '@mastra/core/tools';
 import { z } from 'zod';
-import neo4j from 'neo4j-driver';
-import { getNeo4j } from '../lib/clients';
+import { query } from '../lib/db';
 
 export const listMemories = createTool({
   id: 'list-memories',
@@ -25,59 +24,56 @@ export const listMemories = createTool({
     total: z.number(),
   }),
   execute: async ({ contentType, category, tag, limit, skip }) => {
-    const driver = getNeo4j();
-    const session = driver.session();
-    try {
-      const conditions: string[] = [];
-      const params: Record<string, any> = {
-        limit: neo4j.int(Math.floor(limit || 20)),
-        skip: neo4j.int(Math.floor(skip || 0)),
-      };
+    const maxLimit = Math.floor(limit || 20);
+    const offset = Math.floor(skip || 0);
 
-      let matchClause = 'MATCH (m:Memory)';
+    const conditions: string[] = [];
+    const params: any[] = [];
+    let paramIndex = 1;
 
-      if (tag) {
-        matchClause = 'MATCH (m:Memory)-[:TAGGED]->(t:Tag {name: $tag})';
-        params.tag = tag;
-      }
-
-      if (contentType) {
-        conditions.push('m.contentType = $contentType');
-        params.contentType = contentType;
-      }
-
-      if (category) {
-        conditions.push('m.category = $category');
-        params.category = category;
-      }
-
-      const whereClause = conditions.length > 0
-        ? ` WHERE ${conditions.join(' AND ')}`
-        : '';
-
-      const query = `${matchClause}${whereClause} RETURN m ORDER BY m.createdAt DESC SKIP $skip LIMIT $limit`;
-      const result = await session.run(query, params);
-
-      const memories = result.records.map((r: any) => {
-        const m = r.get('m').properties;
-        return {
-          id: m.id,
-          title: m.title,
-          contentType: m.contentType,
-          category: m.category || '',
-          summary: m.summary || '',
-          createdAt: m.createdAt,
-        };
-      });
-
-      // Count total
-      const countQuery = `${matchClause}${whereClause} RETURN count(m) as total`;
-      const countResult = await session.run(countQuery, params);
-      const total = countResult.records[0]?.get('total')?.toNumber?.() || 0;
-
-      return { memories, total };
-    } finally {
-      await session.close();
+    if (contentType) {
+      conditions.push(`content_type = $${paramIndex++}`);
+      params.push(contentType);
     }
+
+    if (category) {
+      conditions.push(`category = $${paramIndex++}`);
+      params.push(category);
+    }
+
+    if (tag) {
+      conditions.push(`$${paramIndex++} = ANY(tags)`);
+      params.push(tag);
+    }
+
+    const whereClause = conditions.length > 0
+      ? ` WHERE ${conditions.join(' AND ')}`
+      : '';
+
+    // Fetch memories
+    const selectQuery = `SELECT id, title, content_type, category, summary, created_at
+      FROM memories${whereClause}
+      ORDER BY created_at DESC
+      LIMIT $${paramIndex++} OFFSET $${paramIndex++}`;
+    params.push(maxLimit, offset);
+
+    const result = await query(selectQuery, params);
+
+    const memories = result.rows.map((r: any) => ({
+      id: r.id,
+      title: r.title,
+      contentType: r.content_type,
+      category: r.category || '',
+      summary: r.summary || '',
+      createdAt: r.created_at,
+    }));
+
+    // Count total (reuse conditions but without LIMIT/OFFSET params)
+    const countParams = params.slice(0, params.length - 2);
+    const countQuery = `SELECT COUNT(*) AS total FROM memories${whereClause}`;
+    const countResult = await query(countQuery, countParams);
+    const total = Number(countResult.rows[0]?.total || 0);
+
+    return { memories, total };
   },
 });

@@ -1,8 +1,8 @@
 import { Hono } from 'hono';
 import { serveStatic } from 'hono/bun';
-import { getRedis } from '../../lib/clients';
 import { validateToken } from '../../lib/auth';
 import { ingest } from '../../lib/ingest';
+import { initDatabase } from '../../lib/db-init';
 import { validateSession } from './dashboard/session';
 import { auth } from './api/auth';
 import { token } from './api/token';
@@ -48,8 +48,7 @@ const bearerAuth = async (c: any, next: any) => {
     return c.json({ error: 'Missing or invalid Authorization header' }, 401);
   }
   const bearerToken = authHeader.slice(7);
-  const redis = getRedis();
-  const valid = await validateToken(redis, bearerToken);
+  const valid = await validateToken(bearerToken);
   if (!valid) {
     return c.json({ error: 'Invalid token' }, 401);
   }
@@ -123,6 +122,9 @@ app.get('/dashboard/*', serveStatic({ path: './dashboard/dist/index.html' }));
 
 // Redirect root to dashboard
 app.get('/', (c) => c.redirect('/dashboard'));
+
+// Initialize database and start server
+await initDatabase();
 
 const port = parseInt(process.env.PORT || '3001', 10);
 console.log(`Memory Box ingestion webhook listening on port ${port}`);

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { parseGitHubUrl, githubHandler, githubHeaders } from '../../../../lib/pipelines/url-handlers/github';
+import { parseGitHubUrl, githubHandler, githubHeaders } from '../../../../lib/pipeline/url-handlers/github';
 
 describe('githubHandler.match', () => {
   test('github.com → true', () => {

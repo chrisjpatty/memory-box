@@ -1,5 +1,5 @@
 import type { UrlHandler, UrlHandlerResult } from './index';
-import { resolveRelativeUrls } from '../url';
+import { resolveRelativeUrls } from '../url-utils';
 
 const API_BASE = 'https://api.github.com';
 

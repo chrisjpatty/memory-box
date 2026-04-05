@@ -1,15 +1,14 @@
 import { Hono } from 'hono';
-import { getRedis } from '../../../lib/clients';
 import { safeCompare } from '../../../lib/auth';
 import { createSession, validateSession, destroySession } from '../dashboard/session';
-import type Redis from 'ioredis';
 
 const auth = new Hono();
 
 const ADMIN_PASSWORD = () => process.env.ADMIN_PASSWORD;
-const LOGIN_ATTEMPT_PREFIX = 'login:attempts:';
 const MAX_ATTEMPTS = 5;
 const LOCKOUT_SECONDS = 300;
+
+const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
 
 function getClientIp(c: any): string {
   return c.req.header('x-forwarded-for')?.split(',')[0]?.trim()
@@ -17,26 +16,37 @@ function getClientIp(c: any): string {
     || 'unknown';
 }
 
-async function isRateLimited(redis: Redis, ip: string): Promise<{ blocked: boolean; retryAfter?: number }> {
-  const key = `${LOGIN_ATTEMPT_PREFIX}${ip}`;
-  const attempts = await redis.get(key);
-  if (attempts && parseInt(attempts) >= MAX_ATTEMPTS) {
-    const ttl = await redis.ttl(key);
-    return { blocked: true, retryAfter: ttl };
+function cleanupExpired(): void {
+  const now = Date.now();
+  for (const [key, entry] of rateLimitMap) {
+    if (entry.resetAt <= now) {
+      rateLimitMap.delete(key);
+    }
+  }
+}
+
+function isRateLimited(ip: string): { blocked: boolean; retryAfter?: number } {
+  cleanupExpired();
+  const entry = rateLimitMap.get(ip);
+  if (entry && entry.count >= MAX_ATTEMPTS && entry.resetAt > Date.now()) {
+    const retryAfter = Math.ceil((entry.resetAt - Date.now()) / 1000);
+    return { blocked: true, retryAfter };
   }
   return { blocked: false };
 }
 
-async function recordFailedAttempt(redis: Redis, ip: string): Promise<void> {
-  const key = `${LOGIN_ATTEMPT_PREFIX}${ip}`;
-  const count = await redis.incr(key);
-  if (count === 1) {
-    await redis.expire(key, LOCKOUT_SECONDS);
+function recordFailedAttempt(ip: string): void {
+  const now = Date.now();
+  const entry = rateLimitMap.get(ip);
+  if (entry && entry.resetAt > now) {
+    entry.count += 1;
+  } else {
+    rateLimitMap.set(ip, { count: 1, resetAt: now + LOCKOUT_SECONDS * 1000 });
   }
 }
 
-async function clearAttempts(redis: Redis, ip: string): Promise<void> {
-  await redis.del(`${LOGIN_ATTEMPT_PREFIX}${ip}`);
+function clearAttempts(ip: string): void {
+  rateLimitMap.delete(ip);
 }
 
 auth.get('/status', async (c) => {
@@ -45,10 +55,9 @@ auth.get('/status', async (c) => {
 });
 
 auth.post('/login', async (c) => {
-  const redis = getRedis();
   const ip = getClientIp(c);
 
-  const { blocked, retryAfter } = await isRateLimited(redis, ip);
+  const { blocked, retryAfter } = isRateLimited(ip);
   if (blocked) {
     return c.json({ error: `Too many login attempts. Try again in ${retryAfter} seconds.` }, 429);
   }
@@ -60,11 +69,11 @@ auth.post('/login', async (c) => {
   }
 
   if (!safeCompare(password, ADMIN_PASSWORD()!)) {
-    await recordFailedAttempt(redis, ip);
+    recordFailedAttempt(ip);
     return c.json({ error: 'Invalid password.' }, 401);
   }
 
-  await clearAttempts(redis, ip);
+  clearAttempts(ip);
   await createSession(c);
   return c.json({ ok: true });
 });

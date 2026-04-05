@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { getRedis } from '../../../lib/clients';
+import { query } from '../../../lib/db';
 import { saveGitHubToken, getGitHubToken, removeGitHubToken, getTokenInfo } from '../../../lib/import/token-store';
 import { startReprocessJob } from '../../../lib/import/reprocess';
 import {
@@ -97,75 +97,62 @@ importApi.post('/github/start', async (c) => {
 
 // Check for any active import job (survives page refresh)
 importApi.get('/github/active', async (c) => {
-  const redis = getRedis();
-  const activeJobId = await redis.get('active-import-job');
-  if (!activeJobId) return c.json({ active: false });
+  const result = await query(
+    `SELECT * FROM jobs WHERE type = 'import' AND status = 'running' ORDER BY started_at DESC LIMIT 1`
+  );
 
-  const jobData = await redis.hgetall(`import-job:${activeJobId}`);
-  if (!jobData || !jobData.status) {
-    await redis.del('active-import-job');
-    return c.json({ active: false });
-  }
+  if (result.rows.length === 0) return c.json({ active: false });
 
-  const completed = parseInt(jobData.completed || '0');
-  const total = parseInt(jobData.total || '0');
-  const skipped = parseInt(jobData.skipped || '0');
-  const failed = parseInt(jobData.failed || '0');
-
+  const job = result.rows[0];
   return c.json({
     active: true,
-    jobId: activeJobId,
-    status: jobData.status,
-    completed,
-    total,
-    skipped,
-    failed,
-    currentRepo: jobData.currentRepo || '',
-    results: JSON.parse(jobData.results || '[]'),
-    startedAt: jobData.startedAt,
-    completedAt: jobData.completedAt,
+    jobId: job.id,
+    status: job.status,
+    completed: job.completed || 0,
+    total: job.total || 0,
+    skipped: job.skipped || 0,
+    failed: job.failed || 0,
+    currentRepo: job.current_item || '',
+    results: job.results || [],
+    startedAt: job.started_at,
+    completedAt: job.completed_at,
   });
 });
 
-// Poll job status (simple HTTP — works through any proxy)
+// Poll job status (simple HTTP -- works through any proxy)
 importApi.get('/github/:jobId/status', async (c) => {
   const jobId = c.req.param('jobId');
-  const redis = getRedis();
 
-  const jobData = await redis.hgetall(`import-job:${jobId}`);
-  if (!jobData || !jobData.status) {
+  const result = await query('SELECT * FROM jobs WHERE id = $1', [jobId]);
+  if (result.rows.length === 0) {
     return c.json({ error: 'Job not found' }, 404);
   }
 
-  const completed = parseInt(jobData.completed || '0');
-  const total = parseInt(jobData.total || '0');
-  const skipped = parseInt(jobData.skipped || '0');
-  const failed = parseInt(jobData.failed || '0');
-
+  const job = result.rows[0];
   return c.json({
-    status: jobData.status,
-    completed,
-    total,
-    skipped,
-    failed,
-    currentRepo: jobData.currentRepo || '',
-    results: JSON.parse(jobData.results || '[]'),
-    startedAt: jobData.startedAt,
-    completedAt: jobData.completedAt,
-    error: jobData.error,
+    status: job.status,
+    completed: job.completed || 0,
+    total: job.total || 0,
+    skipped: job.skipped || 0,
+    failed: job.failed || 0,
+    currentRepo: job.current_item || '',
+    results: job.results || [],
+    startedAt: job.started_at,
+    completedAt: job.completed_at,
+    error: job.error,
   });
 });
 
 importApi.post('/github/:jobId/cancel', async (c) => {
   const jobId = c.req.param('jobId');
-  const redis = getRedis();
 
-  const status = await redis.hget(`import-job:${jobId}`, 'status');
-  if (!status) return c.json({ error: 'Job not found' }, 404);
+  const result = await query('SELECT status FROM jobs WHERE id = $1', [jobId]);
+  if (result.rows.length === 0) return c.json({ error: 'Job not found' }, 404);
+
+  const { status } = result.rows[0];
   if (status !== 'running') return c.json({ error: `Job is ${status}, not running` }, 400);
 
-  await redis.hset(`import-job:${jobId}`, 'status', 'cancelled');
-  await redis.del('active-import-job');
+  await query(`UPDATE jobs SET status = 'cancelled' WHERE id = $1 AND status = 'running'`, [jobId]);
   return c.json({ success: true, message: 'Cancellation requested' });
 });
 
@@ -185,63 +172,60 @@ importApi.post('/reprocess/start', async (c) => {
 });
 
 importApi.get('/reprocess/active', async (c) => {
-  const redis = getRedis();
-  const activeJobId = await redis.get('active-reprocess-job');
-  if (!activeJobId) return c.json({ active: false });
+  const result = await query(
+    `SELECT * FROM jobs WHERE type = 'reprocess' AND status = 'running' ORDER BY started_at DESC LIMIT 1`
+  );
 
-  const jobData = await redis.hgetall(`reprocess-job:${activeJobId}`);
-  if (!jobData || !jobData.status) {
-    await redis.del('active-reprocess-job');
-    return c.json({ active: false });
-  }
+  if (result.rows.length === 0) return c.json({ active: false });
 
+  const job = result.rows[0];
   return c.json({
     active: true,
-    jobId: activeJobId,
-    status: jobData.status,
-    completed: parseInt(jobData.completed || '0'),
-    total: parseInt(jobData.total || '0'),
-    skipped: parseInt(jobData.skipped || '0'),
-    failed: parseInt(jobData.failed || '0'),
-    currentMemory: jobData.currentMemory || '',
-    startedAt: jobData.startedAt,
-    completedAt: jobData.completedAt,
-    error: jobData.error,
+    jobId: job.id,
+    status: job.status,
+    completed: job.completed || 0,
+    total: job.total || 0,
+    skipped: job.skipped || 0,
+    failed: job.failed || 0,
+    currentMemory: job.current_item || '',
+    startedAt: job.started_at,
+    completedAt: job.completed_at,
+    error: job.error,
   });
 });
 
 importApi.get('/reprocess/:jobId/status', async (c) => {
   const jobId = c.req.param('jobId');
-  const redis = getRedis();
 
-  const jobData = await redis.hgetall(`reprocess-job:${jobId}`);
-  if (!jobData || !jobData.status) {
+  const result = await query('SELECT * FROM jobs WHERE id = $1', [jobId]);
+  if (result.rows.length === 0) {
     return c.json({ error: 'Job not found' }, 404);
   }
 
+  const job = result.rows[0];
   return c.json({
-    status: jobData.status,
-    completed: parseInt(jobData.completed || '0'),
-    total: parseInt(jobData.total || '0'),
-    skipped: parseInt(jobData.skipped || '0'),
-    failed: parseInt(jobData.failed || '0'),
-    currentMemory: jobData.currentMemory || '',
-    startedAt: jobData.startedAt,
-    completedAt: jobData.completedAt,
-    error: jobData.error,
+    status: job.status,
+    completed: job.completed || 0,
+    total: job.total || 0,
+    skipped: job.skipped || 0,
+    failed: job.failed || 0,
+    currentMemory: job.current_item || '',
+    startedAt: job.started_at,
+    completedAt: job.completed_at,
+    error: job.error,
   });
 });
 
 importApi.post('/reprocess/:jobId/cancel', async (c) => {
   const jobId = c.req.param('jobId');
-  const redis = getRedis();
 
-  const status = await redis.hget(`reprocess-job:${jobId}`, 'status');
-  if (!status) return c.json({ error: 'Job not found' }, 404);
+  const result = await query('SELECT status FROM jobs WHERE id = $1', [jobId]);
+  if (result.rows.length === 0) return c.json({ error: 'Job not found' }, 404);
+
+  const { status } = result.rows[0];
   if (status !== 'running') return c.json({ error: `Job is ${status}, not running` }, 400);
 
-  await redis.hset(`reprocess-job:${jobId}`, 'status', 'cancelled');
-  await redis.del('active-reprocess-job');
+  await query(`UPDATE jobs SET status = 'cancelled' WHERE id = $1 AND status = 'running'`, [jobId]);
   return c.json({ success: true, message: 'Cancellation requested' });
 });
 

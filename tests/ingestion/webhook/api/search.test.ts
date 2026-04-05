@@ -1,22 +1,22 @@
 import { describe, expect, test, mock } from 'bun:test';
-import { splitOversizedChunks } from '../../../../lib/embeddings';
-import { createMockRedis, createMockNeo4j, createMockQdrant } from '../../../helpers/mock-clients';
+import { splitOversizedChunks } from '../../../../lib/pipeline/embed';
+import { createMockPool } from '../../../helpers/mock-clients';
 
-const mockRedis = createMockRedis();
-const mockNeo4j = createMockNeo4j();
-const mockQdrant = createMockQdrant();
+const mockPool = createMockPool();
 
-mock.module('../../../../lib/clients', () => ({
-  getRedis: () => mockRedis.instance,
-  getNeo4j: () => mockNeo4j.instance,
-  getQdrant: () => mockQdrant.instance,
-  QDRANT_INDEX_NAME: 'memories',
-  EMBEDDING_DIMENSION: 768,
+mock.module('../../../../lib/db', () => ({
+  getPool: () => mockPool.instance,
+  query: mockPool.instance.query,
+  getClient: mockPool.instance.connect,
 }));
 
-mock.module('../../../../lib/embeddings', () => ({
-  generateEmbedding: async () => new Array(768).fill(0),
-  generateEmbeddings: async (texts: string[]) => texts.map(() => new Array(768).fill(0)),
+mock.module('../../../../lib/pipeline/embed', () => ({
+  getEmbeddingProvider: () => ({
+    embed: async (texts: string[]) => texts.map(() => new Array(768).fill(0)),
+    embedOne: async () => new Array(768).fill(0),
+    dimension: 768,
+  }),
+  setEmbeddingProvider: () => {},
   splitOversizedChunks,
 }));
 

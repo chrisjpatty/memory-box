@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { fallbackClassify } from '../../lib/classifier';
+import { fallbackClassify } from '../../lib/pipeline/classify';
 
 describe('fallbackClassify', () => {
   test('URL content → url type, bookmark category', () => {

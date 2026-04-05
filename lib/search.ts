@@ -1,35 +1,12 @@
-import { getQdrant, getNeo4j, QDRANT_INDEX_NAME } from './clients';
-import { generateEmbedding } from './embeddings';
-
-const FULLTEXT_INDEX_NAME = 'memory_fulltext';
-
-let fulltextIndexReady = false;
-
 /**
- * Ensure the Neo4j fulltext index exists for hybrid keyword search.
- * Creates it on first call; subsequent calls are no-ops.
+ * Hybrid search: combines semantic vector search with keyword fulltext search
+ * using Reciprocal Rank Fusion for the final ranking.
+ *
+ * Both searches run as parallel Postgres queries.
  */
-export async function ensureFulltextIndex(): Promise<void> {
-  if (fulltextIndexReady) return;
-  const driver = getNeo4j();
-  const session = driver.session();
-  try {
-    await session.run(
-      `CREATE FULLTEXT INDEX ${FULLTEXT_INDEX_NAME} IF NOT EXISTS
-       FOR (m:Memory)
-       ON EACH [m.title, m.summary, m.searchContent]`,
-    );
-    fulltextIndexReady = true;
-  } catch (e: any) {
-    // Index may already exist under a different config — that's fine
-    if (!e.message?.includes('already exists')) {
-      console.warn('Fulltext index creation warning:', e.message);
-    }
-    fulltextIndexReady = true;
-  } finally {
-    await session.close();
-  }
-}
+import pgvector from 'pgvector';
+import { query } from './db';
+import { getEmbeddingProvider } from './pipeline/embed';
 
 interface SearchHit {
   memoryId: string;
@@ -45,98 +22,79 @@ interface SearchHit {
 }
 
 /**
- * Vector search via Qdrant embeddings.
+ * Vector search via pgvector embeddings.
  */
-async function vectorSearch(query: string, limit: number): Promise<SearchHit[]> {
-  const qdrant = getQdrant();
-  const queryEmbedding = await generateEmbedding(query);
+async function vectorSearch(queryText: string, limit: number): Promise<SearchHit[]> {
+  const queryEmbedding = await getEmbeddingProvider().embedOne(queryText);
 
-  const results = await qdrant.query({
-    indexName: QDRANT_INDEX_NAME,
-    queryVector: queryEmbedding,
-    topK: limit * 3,
-  });
+  const result = await query(
+    `SELECT DISTINCT ON (mc.memory_id)
+       mc.memory_id, mc.text AS snippet,
+       1 - (mc.embedding <=> $1::vector) AS score,
+       m.title, m.content_type, m.summary, m.tags, m.category,
+       m.created_at, m.source_url
+     FROM memory_chunks mc
+     JOIN memories m ON m.id = mc.memory_id
+     ORDER BY mc.memory_id, mc.embedding <=> $1::vector
+     LIMIT $2`,
+    [pgvector.toSql(queryEmbedding), limit * 3],
+  );
 
-  // Deduplicate by memoryId (multiple chunks may match)
-  const seen = new Set<string>();
-  return results
-    .filter((r: any) => {
-      const mid = r.metadata?.memoryId;
-      if (!mid || seen.has(mid)) return false;
-      seen.add(mid);
-      return true;
-    })
+  // Re-sort by score after DISTINCT ON
+  return result.rows
+    .sort((a: any, b: any) => b.score - a.score)
     .slice(0, limit)
     .map((r: any) => ({
-      memoryId: r.metadata?.memoryId || r.id,
-      title: r.metadata?.title || 'Untitled',
-      contentType: r.metadata?.contentType || 'text',
-      snippet: r.metadata?.text || '',
-      summary: r.metadata?.summary || '',
+      memoryId: r.memory_id,
+      title: r.title || 'Untitled',
+      contentType: r.content_type || 'text',
+      snippet: r.snippet || '',
+      summary: r.summary || '',
       score: r.score || 0,
-      tags: r.metadata?.tags || [],
-      category: r.metadata?.category || '',
-      createdAt: r.metadata?.createdAt || '',
-      source: r.metadata?.source,
+      tags: r.tags || [],
+      category: r.category || '',
+      createdAt: r.created_at?.toISOString?.() || r.created_at || '',
+      source: r.source_url,
     }));
 }
 
 /**
- * Keyword search via Neo4j fulltext index (Lucene-based).
+ * Keyword search via Postgres fulltext (tsvector/tsquery).
  */
-async function keywordSearch(query: string, limit: number): Promise<SearchHit[]> {
-  await ensureFulltextIndex();
-
-  const driver = getNeo4j();
-  const session = driver.session();
+async function keywordSearch(queryText: string, limit: number): Promise<SearchHit[]> {
   try {
-    // Escape special Lucene characters and build a fuzzy query
-    const sanitized = query.replace(/[+\-&|!(){}[\]^"~*?:\\/]/g, '\\$&');
-    // Split into terms and add fuzzy matching (~)
-    const fuzzyQuery = sanitized.split(/\s+/).filter(Boolean).map((t) => `${t}~`).join(' ');
-
-    const result = await session.run(
-      `CALL db.index.fulltext.queryNodes($indexName, $query)
-       YIELD node, score
-       WITH node AS m, score
-       OPTIONAL MATCH (m)-[:TAGGED]->(t:Tag)
-       WITH m, score, collect(t.name) AS tags
-       RETURN m, score, tags
+    const result = await query(
+      `SELECT m.id AS memory_id, m.title, m.content_type, m.summary, m.tags,
+              m.category, m.created_at, m.source_url,
+              LEFT(m.search_content, 300) AS snippet,
+              ts_rank(m.search_vector, plainto_tsquery('english', $1)) AS score
+       FROM memories m
+       WHERE m.search_vector @@ plainto_tsquery('english', $1)
        ORDER BY score DESC
-       LIMIT $limit`,
-      { indexName: FULLTEXT_INDEX_NAME, query: fuzzyQuery || query, limit: Math.floor(limit) },
+       LIMIT $2`,
+      [queryText, limit],
     );
 
-    return result.records.map((r: any) => {
-      const m = r.get('m').properties;
-      const score = r.get('score');
-      const tags = r.get('tags') || [];
-      return {
-        memoryId: m.id,
-        title: m.title || 'Untitled',
-        contentType: m.contentType || 'text',
-        snippet: (m.searchContent || '').slice(0, 300),
-        summary: m.summary || '',
-        score: typeof score === 'number' ? score : score?.toNumber?.() || 0,
-        tags,
-        category: m.category || '',
-        createdAt: m.createdAt || '',
-        source: undefined,
-      };
-    });
+    return result.rows.map((r: any) => ({
+      memoryId: r.memory_id,
+      title: r.title || 'Untitled',
+      contentType: r.content_type || 'text',
+      snippet: r.snippet || '',
+      summary: r.summary || '',
+      score: r.score || 0,
+      tags: r.tags || [],
+      category: r.category || '',
+      createdAt: r.created_at?.toISOString?.() || r.created_at || '',
+      source: r.source_url,
+    }));
   } catch (e: any) {
     console.warn('Keyword search failed, falling back to vector-only:', e.message);
     return [];
-  } finally {
-    await session.close();
   }
 }
 
 /**
  * Reciprocal Rank Fusion: merge two ranked lists into a single ranking.
- * Higher-scored items from either list get boosted; items in both lists get the most boost.
- *
- * @param k - smoothing constant (default 60, standard in RRF literature)
  */
 function reciprocalRankFusion(
   vectorResults: SearchHit[],
@@ -155,7 +113,6 @@ function reciprocalRankFusion(
     const existing = scores.get(hit.memoryId);
     if (existing) {
       existing.rrfScore += rrfScore;
-      // Prefer the vector hit's snippet (chunk-level) over keyword hit's snippet
     } else {
       scores.set(hit.memoryId, { hit, rrfScore });
     }
@@ -170,14 +127,13 @@ function reciprocalRankFusion(
  * Hybrid search: combines semantic vector search with keyword fulltext search
  * using Reciprocal Rank Fusion for the final ranking.
  */
-export async function hybridSearch(query: string, limit = 5): Promise<{
+export async function hybridSearch(queryText: string, limit = 5): Promise<{
   results: SearchHit[];
   totalFound: number;
 }> {
-  // Run both searches in parallel
   const [vectorHits, keywordHits] = await Promise.all([
-    vectorSearch(query, limit * 2),
-    keywordSearch(query, limit * 2),
+    vectorSearch(queryText, limit * 2),
+    keywordSearch(queryText, limit * 2),
   ]);
 
   const merged = reciprocalRankFusion(vectorHits, keywordHits);

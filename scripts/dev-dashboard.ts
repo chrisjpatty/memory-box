@@ -27,6 +27,7 @@ import { search } from '../ingestion/webhook/api/search';
 import { ingestApi } from '../ingestion/webhook/api/ingest';
 import { importApi } from '../ingestion/webhook/api/import';
 import { startAutoSync } from '../lib/import/github-stars';
+import { initDatabase } from '../lib/db-init';
 
 // Load secrets from ast project config
 try {
@@ -45,12 +46,11 @@ try {
 } catch { /* config not found, rely on manual env */ }
 
 // Default env for local dev (Docker services on localhost)
-process.env.REDIS_HOST ??= 'localhost';
-process.env.REDIS_PORT ??= '6379';
-process.env.NEO4J_HOST ??= 'localhost';
-process.env.NEO4J_PORT ??= '7687';
-process.env.QDRANT_HOST ??= 'localhost';
-process.env.QDRANT_PORT ??= '6333';
+process.env.POSTGRES_HOST ??= 'localhost';
+process.env.POSTGRES_PORT ??= '5432';
+process.env.POSTGRES_DB ??= 'memory_box';
+process.env.POSTGRES_USER ??= 'postgres';
+process.env.POSTGRES_PASSWORD ??= 'postgres';
 process.env.ADMIN_PASSWORD ??= 'dev';
 
 // MinIO in Docker uses its built-in defaults — force these for local dev
@@ -83,7 +83,8 @@ app.route('/api/search', search);
 app.route('/api/ingest', ingestApi);
 app.route('/api/import', importApi);
 
-// Initialize auto-sync if previously enabled
+// Initialize database and auto-sync
+await initDatabase();
 startAutoSync().catch(() => {});
 
 const port = parseInt(process.env.PORT || '3002', 10);

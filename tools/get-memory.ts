@@ -1,6 +1,6 @@
 import { createTool } from '@mastra/core/tools';
 import { z } from 'zod';
-import { getRedis } from '../lib/clients';
+import { query } from '../lib/db';
 
 export const getMemory = createTool({
   id: 'get-memory',
@@ -19,30 +19,33 @@ export const getMemory = createTool({
       tags: z.array(z.string()),
       createdAt: z.string(),
       source: z.string().optional(),
+      rawContent: z.string().optional(),
       processedContent: z.string(),
       markdown: z.string().optional(),
+      extra: z.record(z.any()).optional(),
     }).optional(),
   }),
   execute: async ({ memoryId }) => {
-    const redis = getRedis();
-    const data = await redis.get(`memory:${memoryId}`);
+    const result = await query('SELECT * FROM memories WHERE id = $1', [memoryId]);
 
-    if (!data) return { found: false };
+    if (result.rows.length === 0) return { found: false };
 
-    const memory = JSON.parse(data);
+    const row = result.rows[0];
     return {
       found: true,
       memory: {
-        id: memory.id,
-        title: memory.title,
-        contentType: memory.contentType,
-        category: memory.category,
-        summary: memory.summary,
-        tags: memory.tags || [],
-        createdAt: memory.createdAt,
-        source: memory.source,
-        processedContent: memory.processedContent,
-        markdown: memory.markdown,
+        id: row.id,
+        title: row.title,
+        contentType: row.content_type,
+        category: row.category,
+        summary: row.summary,
+        tags: row.tags || [],
+        createdAt: row.created_at,
+        source: row.source_url || undefined,
+        rawContent: row.raw_content || undefined,
+        processedContent: row.processed_content || '',
+        markdown: row.markdown || undefined,
+        extra: row.metadata || undefined,
       },
     };
   },

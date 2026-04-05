@@ -1,8 +1,7 @@
 import { createCipheriv, createDecipheriv, randomBytes, scryptSync } from 'crypto';
-import { getRedis } from '../clients';
-import { githubFetch } from '../pipelines/url-handlers/github';
+import { query } from '../db';
+import { githubFetch } from '../pipeline/url-handlers/github';
 
-const REDIS_KEY = 'github:token';
 const ALGORITHM = 'aes-256-gcm';
 
 function getEncryptionKey(): Buffer {
@@ -34,29 +33,36 @@ function decrypt(stored: string): string {
 
 export async function saveGitHubToken(token: string): Promise<{ username: string; hint: string }> {
   const username = await getGitHubUsername(token);
-  const redis = getRedis();
-  await redis.set(REDIS_KEY, encrypt(token));
-  await redis.set('github-sync:username', username);
+  const encryptedToken = encrypt(token);
+
+  await query(
+    `INSERT INTO settings (key, value) VALUES ('github_token', $1)
+     ON CONFLICT (key) DO UPDATE SET value = $1`,
+    [encryptedToken],
+  );
+  await query(
+    `INSERT INTO settings (key, value) VALUES ('github_sync_username', $1)
+     ON CONFLICT (key) DO UPDATE SET value = $1`,
+    [username],
+  );
+
   return { username, hint: tokenHint(token) };
 }
 
 export async function getGitHubToken(): Promise<string | null> {
-  const redis = getRedis();
-  const stored = await redis.get(REDIS_KEY);
-  if (!stored) return null;
+  const result = await query(`SELECT value FROM settings WHERE key = 'github_token'`);
+  if (result.rows.length === 0) return null;
   try {
-    return decrypt(stored);
+    return decrypt(result.rows[0].value);
   } catch {
     return null;
   }
 }
 
 export async function removeGitHubToken(): Promise<void> {
-  const redis = getRedis();
-  await redis.del(REDIS_KEY);
-  await redis.del('github-sync:username');
-  await redis.del('github-sync:enabled');
-  await redis.del('github-sync:lastCheck');
+  await query(
+    `DELETE FROM settings WHERE key IN ('github_token', 'github_sync_username', 'github_sync_enabled', 'github_sync_last_check')`,
+  );
 }
 
 export function tokenHint(token: string): string {
@@ -78,8 +84,8 @@ export async function getTokenInfo(): Promise<{
   }
   if (!token) return { hasToken: false };
 
-  const redis = getRedis();
-  const username = await redis.get('github-sync:username') || undefined;
+  const usernameResult = await query(`SELECT value FROM settings WHERE key = 'github_sync_username'`);
+  const username = usernameResult.rows[0]?.value || undefined;
 
   let rateLimit: { remaining: number; limit: number; reset: string } | undefined;
   try {
@@ -90,7 +96,7 @@ export async function getTokenInfo(): Promise<{
       reset: new Date((rl.rate?.reset || 0) * 1000).toISOString(),
     };
   } catch {
-    // Rate limit check is non-critical — token is still valid
+    // Rate limit check is non-critical -- token is still valid
   }
 
   return {

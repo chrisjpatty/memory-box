@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { detectChunkingStrategy } from '../../../lib/pipelines/text';
+import { detectChunkingStrategy } from '../../../lib/pipeline/chunk';
 
 describe('detectChunkingStrategy', () => {
   test('content with 2+ markdown headings → markdown strategy', () => {

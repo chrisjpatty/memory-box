@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { resolveRelativeUrls } from '../../../lib/pipelines/url';
+import { resolveRelativeUrls } from '../../../lib/pipeline/url-utils';
 
 describe('resolveRelativeUrls', () => {
   const base = 'https://example.com/docs/guide/';

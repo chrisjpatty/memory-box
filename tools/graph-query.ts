@@ -1,6 +1,6 @@
 import { createTool } from '@mastra/core/tools';
 import { z } from 'zod';
-import { getNeo4j } from '../lib/clients';
+import { query } from '../lib/db';
 
 export const graphQuery = createTool({
   id: 'graph-query',
@@ -31,211 +31,204 @@ export const graphQuery = createTool({
     summary: z.string(),
   }),
   execute: async ({ queryType, memoryId, tag, category, limit }) => {
-    const driver = getNeo4j();
-    const session = driver.session();
     const maxResults = Math.floor(limit || 10);
 
-    try {
-      switch (queryType) {
-        case 'related-memories': {
-          // Find memories that share tags with the given memory
-          if (!memoryId) return { queryType, results: [], summary: 'Missing memoryId parameter' };
+    switch (queryType) {
+      case 'related-memories': {
+        if (!memoryId) return { queryType, results: [], summary: 'Missing memoryId parameter' };
 
-          const result = await session.run(
-            `MATCH (m:Memory {id: $id})-[:TAGGED]->(t:Tag)<-[:TAGGED]-(related:Memory)
-             WHERE related.id <> $id
-             WITH related, collect(DISTINCT t.name) AS sharedTags, count(t) AS overlap
-             RETURN related.id AS id, related.title AS title, related.contentType AS contentType,
-                    related.summary AS summary, related.createdAt AS createdAt,
-                    sharedTags, overlap
-             ORDER BY overlap DESC
-             LIMIT $limit`,
-            { id: memoryId, limit: maxResults },
-          );
+        const result = await query(
+          `SELECT m2.id, m2.title, m2.content_type, m2.summary, m2.created_at,
+                  array_agg(shared_tag) AS shared_tags, COUNT(shared_tag) AS overlap
+           FROM memories m1, unnest(m1.tags) AS shared_tag
+           JOIN memories m2 ON shared_tag = ANY(m2.tags) AND m2.id != m1.id
+           WHERE m1.id = $1
+           GROUP BY m2.id, m2.title, m2.content_type, m2.summary, m2.created_at
+           ORDER BY overlap DESC
+           LIMIT $2`,
+          [memoryId, maxResults],
+        );
 
-          const results = result.records.map((r: any) => ({
-            id: r.get('id'),
-            title: r.get('title'),
-            contentType: r.get('contentType'),
-            summary: r.get('summary'),
-            createdAt: r.get('createdAt'),
-            sharedTags: r.get('sharedTags'),
-            overlap: r.get('overlap')?.toNumber?.() || r.get('overlap'),
-          }));
+        const results = result.rows.map((r: any) => ({
+          id: r.id,
+          title: r.title,
+          contentType: r.content_type,
+          summary: r.summary,
+          createdAt: r.created_at,
+          sharedTags: r.shared_tags,
+          overlap: Number(r.overlap),
+        }));
 
-          return {
-            queryType,
-            results,
-            summary: `Found ${results.length} memories related to ${memoryId} through shared tags`,
-          };
-        }
-
-        case 'tag-co-occurrence': {
-          // Find tags that frequently appear alongside the given tag
-          if (!tag) return { queryType, results: [], summary: 'Missing tag parameter' };
-
-          const result = await session.run(
-            `MATCH (t1:Tag {name: $tag})<-[:TAGGED]-(m:Memory)-[:TAGGED]->(t2:Tag)
-             WHERE t2.name <> $tag
-             WITH t2.name AS coTag, count(m) AS coCount
-             RETURN coTag, coCount
-             ORDER BY coCount DESC
-             LIMIT $limit`,
-            { tag, limit: maxResults },
-          );
-
-          const results = result.records.map((r: any) => ({
-            tag: r.get('coTag'),
-            coOccurrences: r.get('coCount')?.toNumber?.() || r.get('coCount'),
-          }));
-
-          return {
-            queryType,
-            results,
-            summary: `Tags that co-occur with "${tag}": ${results.map((r: any) => `${r.tag} (${r.coOccurrences})`).join(', ')}`,
-          };
-        }
-
-        case 'top-tags': {
-          const result = await session.run(
-            `MATCH (t:Tag)<-[:TAGGED]-(m:Memory)
-             WITH t.name AS tagName, count(m) AS memoryCount
-             RETURN tagName, memoryCount
-             ORDER BY memoryCount DESC
-             LIMIT $limit`,
-            { limit: maxResults },
-          );
-
-          const results = result.records.map((r: any) => ({
-            tag: r.get('tagName'),
-            count: r.get('memoryCount')?.toNumber?.() || r.get('memoryCount'),
-          }));
-
-          return {
-            queryType,
-            results,
-            summary: `Top ${results.length} tags: ${results.map((r: any) => `${r.tag} (${r.count})`).join(', ')}`,
-          };
-        }
-
-        case 'top-categories': {
-          const result = await session.run(
-            `MATCH (c:Category)<-[:CATEGORIZED]-(m:Memory)
-             WITH c.name AS categoryName, count(m) AS memoryCount
-             RETURN categoryName, memoryCount
-             ORDER BY memoryCount DESC
-             LIMIT $limit`,
-            { limit: maxResults },
-          );
-
-          const results = result.records.map((r: any) => ({
-            category: r.get('categoryName'),
-            count: r.get('memoryCount')?.toNumber?.() || r.get('memoryCount'),
-          }));
-
-          return {
-            queryType,
-            results,
-            summary: `Top ${results.length} categories: ${results.map((r: any) => `${r.category} (${r.count})`).join(', ')}`,
-          };
-        }
-
-        case 'tags-for-category': {
-          if (!category) return { queryType, results: [], summary: 'Missing category parameter' };
-
-          const result = await session.run(
-            `MATCH (c:Category {name: $category})<-[:CATEGORIZED]-(m:Memory)-[:TAGGED]->(t:Tag)
-             WITH t.name AS tagName, count(m) AS memoryCount
-             RETURN tagName, memoryCount
-             ORDER BY memoryCount DESC
-             LIMIT $limit`,
-            { category, limit: maxResults },
-          );
-
-          const results = result.records.map((r: any) => ({
-            tag: r.get('tagName'),
-            count: r.get('memoryCount')?.toNumber?.() || r.get('memoryCount'),
-          }));
-
-          return {
-            queryType,
-            results,
-            summary: `Tags in category "${category}": ${results.map((r: any) => `${r.tag} (${r.count})`).join(', ')}`,
-          };
-        }
-
-        case 'recent-activity': {
-          const result = await session.run(
-            `MATCH (m:Memory)
-             OPTIONAL MATCH (m)-[:TAGGED]->(t:Tag)
-             WITH m, collect(t.name) AS tags
-             RETURN m.id AS id, m.title AS title, m.contentType AS contentType,
-                    m.category AS category, m.createdAt AS createdAt, tags
-             ORDER BY m.createdAt DESC
-             LIMIT $limit`,
-            { limit: maxResults },
-          );
-
-          const results = result.records.map((r: any) => ({
-            id: r.get('id'),
-            title: r.get('title'),
-            contentType: r.get('contentType'),
-            category: r.get('category'),
-            createdAt: r.get('createdAt'),
-            tags: r.get('tags'),
-          }));
-
-          return {
-            queryType,
-            results,
-            summary: `${results.length} most recently saved memories`,
-          };
-        }
-
-        case 'memory-connections': {
-          // Show the full connection graph for a specific memory
-          if (!memoryId) return { queryType, results: [], summary: 'Missing memoryId parameter' };
-
-          const result = await session.run(
-            `MATCH (m:Memory {id: $id})
-             OPTIONAL MATCH (m)-[:TAGGED]->(t:Tag)
-             OPTIONAL MATCH (m)-[:CATEGORIZED]->(c:Category)
-             WITH m, collect(DISTINCT t.name) AS tags, collect(DISTINCT c.name) AS categories
-             OPTIONAL MATCH (m)-[:TAGGED]->(t:Tag)<-[:TAGGED]-(related:Memory)
-             WHERE related.id <> $id
-             WITH m, tags, categories, collect(DISTINCT {id: related.id, title: related.title}) AS relatedMemories
-             RETURN m.title AS title, m.contentType AS contentType, m.summary AS summary,
-                    m.createdAt AS createdAt, tags, categories, relatedMemories`,
-            { id: memoryId },
-          );
-
-          if (result.records.length === 0) {
-            return { queryType, results: [], summary: `Memory ${memoryId} not found in graph` };
-          }
-
-          const r = result.records[0];
-          const connections = {
-            title: r.get('title'),
-            contentType: r.get('contentType'),
-            summary: r.get('summary'),
-            createdAt: r.get('createdAt'),
-            tags: r.get('tags'),
-            categories: r.get('categories'),
-            relatedMemories: r.get('relatedMemories'),
-          };
-
-          return {
-            queryType,
-            results: [connections],
-            summary: `Memory "${connections.title}" has ${connections.tags.length} tags, ${connections.relatedMemories.length} related memories`,
-          };
-        }
-
-        default:
-          return { queryType, results: [], summary: `Unknown query type: ${queryType}` };
+        return {
+          queryType,
+          results,
+          summary: `Found ${results.length} memories related to ${memoryId} through shared tags`,
+        };
       }
-    } finally {
-      await session.close();
+
+      case 'tag-co-occurrence': {
+        if (!tag) return { queryType, results: [], summary: 'Missing tag parameter' };
+
+        const result = await query(
+          `SELECT t2 AS co_tag, COUNT(*) AS co_count
+           FROM memories m, unnest(m.tags) AS t1, unnest(m.tags) AS t2
+           WHERE t1 = $1 AND t2 != $1
+           GROUP BY t2
+           ORDER BY co_count DESC
+           LIMIT $2`,
+          [tag, maxResults],
+        );
+
+        const results = result.rows.map((r: any) => ({
+          tag: r.co_tag,
+          coOccurrences: Number(r.co_count),
+        }));
+
+        return {
+          queryType,
+          results,
+          summary: `Tags that co-occur with "${tag}": ${results.map((r: any) => `${r.tag} (${r.coOccurrences})`).join(', ')}`,
+        };
+      }
+
+      case 'top-tags': {
+        const result = await query(
+          `SELECT tag AS tag_name, COUNT(*) AS memory_count
+           FROM (SELECT unnest(tags) AS tag FROM memories) sub
+           GROUP BY tag
+           ORDER BY memory_count DESC
+           LIMIT $1`,
+          [maxResults],
+        );
+
+        const results = result.rows.map((r: any) => ({
+          tag: r.tag_name,
+          count: Number(r.memory_count),
+        }));
+
+        return {
+          queryType,
+          results,
+          summary: `Top ${results.length} tags: ${results.map((r: any) => `${r.tag} (${r.count})`).join(', ')}`,
+        };
+      }
+
+      case 'top-categories': {
+        const result = await query(
+          `SELECT category AS category_name, COUNT(*) AS memory_count
+           FROM memories
+           GROUP BY category
+           ORDER BY memory_count DESC
+           LIMIT $1`,
+          [maxResults],
+        );
+
+        const results = result.rows.map((r: any) => ({
+          category: r.category_name,
+          count: Number(r.memory_count),
+        }));
+
+        return {
+          queryType,
+          results,
+          summary: `Top ${results.length} categories: ${results.map((r: any) => `${r.category} (${r.count})`).join(', ')}`,
+        };
+      }
+
+      case 'tags-for-category': {
+        if (!category) return { queryType, results: [], summary: 'Missing category parameter' };
+
+        const result = await query(
+          `SELECT tag AS tag_name, COUNT(*) AS memory_count
+           FROM (SELECT unnest(tags) AS tag FROM memories WHERE category = $1) sub
+           GROUP BY tag
+           ORDER BY memory_count DESC
+           LIMIT $2`,
+          [category, maxResults],
+        );
+
+        const results = result.rows.map((r: any) => ({
+          tag: r.tag_name,
+          count: Number(r.memory_count),
+        }));
+
+        return {
+          queryType,
+          results,
+          summary: `Tags in category "${category}": ${results.map((r: any) => `${r.tag} (${r.count})`).join(', ')}`,
+        };
+      }
+
+      case 'recent-activity': {
+        const result = await query(
+          `SELECT m.id, m.title, m.content_type AS "contentType", m.category,
+                  m.created_at AS "createdAt", m.tags
+           FROM memories m
+           ORDER BY m.created_at DESC
+           LIMIT $1`,
+          [maxResults],
+        );
+
+        const results = result.rows.map((r: any) => ({
+          id: r.id,
+          title: r.title,
+          contentType: r.contentType,
+          category: r.category,
+          createdAt: r.createdAt,
+          tags: r.tags || [],
+        }));
+
+        return {
+          queryType,
+          results,
+          summary: `${results.length} most recently saved memories`,
+        };
+      }
+
+      case 'memory-connections': {
+        if (!memoryId) return { queryType, results: [], summary: 'Missing memoryId parameter' };
+
+        // First get the memory's own data
+        const memResult = await query(
+          `SELECT title, content_type, summary, created_at, tags, category
+           FROM memories WHERE id = $1`,
+          [memoryId],
+        );
+
+        if (memResult.rows.length === 0) {
+          return { queryType, results: [], summary: `Memory ${memoryId} not found in graph` };
+        }
+
+        const mem = memResult.rows[0];
+
+        // Find related memories via tag overlap
+        const relatedResult = await query(
+          `SELECT DISTINCT m2.id, m2.title
+           FROM memories m1, unnest(m1.tags) AS shared_tag
+           JOIN memories m2 ON shared_tag = ANY(m2.tags) AND m2.id != m1.id
+           WHERE m1.id = $1`,
+          [memoryId],
+        );
+
+        const connections = {
+          title: mem.title,
+          contentType: mem.content_type,
+          summary: mem.summary,
+          createdAt: mem.created_at,
+          tags: mem.tags || [],
+          categories: mem.category ? [mem.category] : [],
+          relatedMemories: relatedResult.rows.map((r: any) => ({ id: r.id, title: r.title })),
+        };
+
+        return {
+          queryType,
+          results: [connections],
+          summary: `Memory "${connections.title}" has ${connections.tags.length} tags, ${connections.relatedMemories.length} related memories`,
+        };
+      }
+
+      default:
+        return { queryType, results: [], summary: `Unknown query type: ${queryType}` };
     }
   },
 });
