@@ -11,7 +11,8 @@ function resolveConnectionConfig(): pg.PoolConfig {
   }
   // Astropods custom knowledge containers are accessible by service name on the Docker network.
   // The "db" entry in astropods.yml becomes "knowledge-db" as the Docker service name.
-  const host = process.env.DB_HOST || process.env.POSTGRES_HOST || 'knowledge-db';
+  // Astropods injects POSTGRES_HOST/POSTGRES_PORT for the postgres provider.
+  const host = process.env.POSTGRES_HOST || process.env.DB_HOST || '127.0.0.1';
   const port = parseInt(process.env.DB_PORT || process.env.POSTGRES_PORT || '5432');
   const database = process.env.POSTGRES_DB || 'memory_box';
   const user = process.env.POSTGRES_USER || 'postgres';

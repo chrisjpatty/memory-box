@@ -29,11 +29,10 @@ models:
 
 knowledge:
   db:
+    provider: postgres
+    persistent: true
     container:
-      build:
-        context: .
-        dockerfile: postgres.Dockerfile
-      port: 5432
+      image: pgvector/pgvector:pg17
   files:
     container:
       build:
