@@ -1,0 +1,43 @@
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Astropods
+.ast/
+
+# Claude Code
+.claude/
+
+# Dependencies
+node_modules/
+dashboard/node_modules/
+
+# Build
+dist/
+dashboard/dist/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Bun
+bun.lockb
+
+# Runtime data
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage
+coverage/

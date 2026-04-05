@@ -1,0 +1,42 @@
+{
+  "name": "memory-box",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "A box for all your memories, ingested into your own personal database",
+  "scripts": {
+    "dev": "bun --watch agent/index.ts",
+    "dev:ingest": "bun --watch ingestion/webhook/index.ts",
+    "dev:dashboard": "bun --watch scripts/dev-dashboard.ts",
+    "start": "bun agent/index.ts",
+    "ingest": "bun ingestion/webhook/index.ts"
+  },
+  "main": "./agent/index.ts",
+  "dependencies": {
+    "@astropods/adapter-mastra": "latest",
+    "@aws-sdk/client-s3": "^3.1024.0",
+    "@mastra/core": "latest",
+    "@mastra/libsql": "latest",
+    "@mastra/memory": "latest",
+    "@mastra/observability": "latest",
+    "@mastra/otel-exporter": "latest",
+    "@mastra/qdrant": "latest",
+    "@mastra/rag": "latest",
+    "@opentelemetry/exporter-trace-otlp-proto": "latest",
+    "ai": "latest",
+    "cheerio": "^1",
+    "hono": "^4",
+    "ioredis": "^5",
+    "nanoid": "^5",
+    "neo4j-driver": "^5",
+    "ollama-ai-provider": "^1.2.0",
+    "pdf-parse": "^2.4.5",
+    "sharp": "^0.34.5",
+    "turndown": "^7",
+    "zod": "^3"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.1.14",
+    "@types/turndown": "^5",
+    "typescript": "^5.9.3"
+  }
+}

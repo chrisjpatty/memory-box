@@ -1,0 +1,59 @@
+# yaml-language-server: $schema=https://astropods.ai/schema/package.json
+spec: package/v1
+name: memory-box
+
+agent:
+  build:
+    context: .
+    dockerfile: Dockerfile
+  inputs:
+    - name: ADMIN_PASSWORD
+      datatype: string
+      secret: true
+      description: Password for the Memory Box admin dashboard (token management)
+    - name: MINIO_ROOT_USER
+      datatype: string
+      description: MinIO root username for file storage
+      default: minioadmin
+    - name: MINIO_ROOT_PASSWORD
+      datatype: string
+      secret: true
+      description: MinIO root password for file storage
+
+models:
+  ollama:
+    provider: ollama
+    models: [nomic-embed-text]
+  anthropic:
+    provider: anthropic
+
+knowledge:
+  docs:
+    provider: qdrant
+    persistent: true
+  cache:
+    provider: redis
+    persistent: true
+  graph:
+    provider: neo4j
+    persistent: true
+  files:
+    container:
+      build:
+        context: .
+        dockerfile: minio.Dockerfile
+      port: 9000
+
+ingestion:
+  webhook:
+    container:
+      build:
+        context: .
+        dockerfile: ingestion/webhook/Dockerfile
+    trigger:
+      type: webhook
+
+dev:
+  interfaces:
+    messaging:
+      adapters: [web]
