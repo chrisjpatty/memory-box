@@ -45,8 +45,9 @@ export async function githubFetch(path: string, token?: string): Promise<any> {
 
 /**
  * Parse a GitHub URL into its component parts.
+ * @internal Exported for testing.
  */
-function parseGitHubUrl(url: URL): {
+export function parseGitHubUrl(url: URL): {
   owner: string;
   repo: string;
   type: 'repo' | 'issue' | 'pull' | 'discussion' | 'file' | 'other';

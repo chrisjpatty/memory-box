@@ -23,8 +23,9 @@ async function ensureIndex() {
 /**
  * Detect the content format and return the best chunking config.
  * Uses heuristics to pick between markdown, html, and recursive strategies.
+ * @internal Exported for testing.
  */
-function detectChunkingStrategy(content: string, contentType?: string): {
+export function detectChunkingStrategy(content: string, contentType?: string): {
   strategy: 'markdown' | 'html' | 'recursive';
   maxSize: number;
   overlap: number;

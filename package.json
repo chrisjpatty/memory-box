@@ -4,6 +4,7 @@
   "type": "module",
   "description": "A box for all your memories, ingested into your own personal database",
   "scripts": {
+    "test": "bun test",
     "dev": "bun --watch agent/index.ts",
     "dev:ingest": "bun --watch ingestion/webhook/index.ts",
     "dev:dashboard": "bun --watch scripts/dev-dashboard.ts",

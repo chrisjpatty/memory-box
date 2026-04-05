@@ -68,7 +68,8 @@ ${content.slice(0, 10000)}
   return fallbackClassify(content, userTitle, userTags);
 }
 
-function fallbackClassify(
+/** @internal Exported for testing. */
+export function fallbackClassify(
   content: string,
   userTitle?: string,
   userTags?: string[],

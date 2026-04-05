@@ -9,8 +9,9 @@ import type { IngestRequest, IngestResult, ClassificationResult, ContentType } f
 
 /**
  * Deterministic content type detection for cases where we don't need an LLM.
+ * @internal Exported for testing.
  */
-function detectContentType(content: string): ContentType | null {
+export function detectContentType(content: string): ContentType | null {
   const trimmed = content.trim();
 
   try {
@@ -26,8 +27,9 @@ function detectContentType(content: string): ContentType | null {
 
 /**
  * Detect content type from a file buffer's magic bytes.
+ * @internal Exported for testing.
  */
-function detectFromBuffer(buffer: Buffer, mimeType?: string): ContentType {
+export function detectFromBuffer(buffer: Buffer, mimeType?: string): ContentType {
   // PDF: starts with %PDF
   if (buffer[0] === 0x25 && buffer[1] === 0x50 && buffer[2] === 0x44 && buffer[3] === 0x46) return 'pdf';
   // PNG
@@ -47,8 +49,9 @@ function detectFromBuffer(buffer: Buffer, mimeType?: string): ContentType {
 
 /**
  * Build classification metadata for images without calling the LLM.
+ * @internal Exported for testing.
  */
-function classifyImage(content: string, title?: string, tags?: string[]): ClassificationResult {
+export function classifyImage(content: string, title?: string, tags?: string[]): ClassificationResult {
   const mimeMatch = content.match(/^data:([^;]+);/);
   const mimeType = mimeMatch ? mimeMatch[1] : 'image/unknown';
   const extension = mimeType.split('/')[1] || 'unknown';
@@ -66,8 +69,9 @@ function classifyImage(content: string, title?: string, tags?: string[]): Classi
 /**
  * Build classification metadata for PDFs without calling the LLM.
  * The PDF pipeline extracts text and re-classifies with richer content.
+ * @internal Exported for testing.
  */
-function classifyPdf(title?: string, tags?: string[], fileName?: string): ClassificationResult {
+export function classifyPdf(title?: string, tags?: string[], fileName?: string): ClassificationResult {
   return {
     contentType: 'pdf',
     title: title || fileName || 'PDF Document',
@@ -80,11 +84,13 @@ function classifyPdf(title?: string, tags?: string[], fileName?: string): Classi
 
 // --- Deduplication ---
 
-function contentHash(content: string): string {
+/** @internal Exported for testing. */
+export function contentHash(content: string): string {
   return createHash('sha256').update(content).digest('hex');
 }
 
-function bufferHash(buffer: Buffer): string {
+/** @internal Exported for testing. */
+export function bufferHash(buffer: Buffer): string {
   return createHash('sha256').update(buffer).digest('hex');
 }
 
