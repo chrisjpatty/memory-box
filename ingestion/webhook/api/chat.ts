@@ -15,5 +15,32 @@ chat.post('/', async (c) => {
     params,
   });
 
-  return createUIMessageStreamResponse({ stream });
+  // createUIMessageStreamResponse builds a Response with SSE headers and a
+  // ReadableStream body. Bun's default ReadableStream buffers small writes,
+  // so we re-pipe through a "direct" stream that flushes after every chunk.
+  const sseResponse = createUIMessageStreamResponse({ stream });
+  const sseBody = sseResponse.body;
+  if (!sseBody) return sseResponse;
+
+  const flushedStream = new ReadableStream({
+    type: 'direct' as any,
+    async pull(controller: any) {
+      const reader = sseBody.getReader();
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          controller.write(value);
+          controller.flush();
+        }
+      } finally {
+        controller.close();
+      }
+    },
+  });
+
+  return new Response(flushedStream, {
+    status: sseResponse.status,
+    headers: sseResponse.headers,
+  });
 });
