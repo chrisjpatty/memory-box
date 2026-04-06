@@ -10,7 +10,7 @@
  * Then in another terminal:
  *   cd dashboard && bun run dev
  *
- * Open http://localhost:5173/dashboard
+ * Open http://localhost:5173
  */
 
 import { readFileSync } from 'fs';

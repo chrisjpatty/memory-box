@@ -118,12 +118,8 @@ app.post('/ingest/batch', bearerAuth, async (c) => {
 
 // --- Dashboard SPA (static files in production) ---
 
-app.use('/dashboard/*', serveStatic({ root: './', rewriteRequestPath: (path) => path.replace('/dashboard', '/dashboard/dist') }));
-app.get('/dashboard', serveStatic({ path: './dashboard/dist/index.html' }));
-app.get('/dashboard/*', serveStatic({ path: './dashboard/dist/index.html' }));
-
-// Redirect root to dashboard
-app.get('/', (c) => c.redirect('/dashboard'));
+app.use('/*', serveStatic({ root: './dashboard/dist' }));
+app.get('/*', serveStatic({ path: './dashboard/dist/index.html' }));
 
 // Initialize database and start server
 await initDatabase();

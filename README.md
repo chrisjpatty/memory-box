@@ -17,7 +17,7 @@ ast dev
 ```
 
 - **Agent playground**: http://localhost:3000
-- **Admin dashboard**: http://localhost:3001/dashboard
+- **Admin dashboard**: http://localhost:3001
 
 ## How It Works
 
@@ -71,7 +71,7 @@ bun run dev:dashboard
 cd dashboard && bun run dev
 ```
 
-Open http://localhost:5173/dashboard — Vite proxies `/api/*` to the standalone API server, which connects to the Docker-managed Redis, Neo4j, and Qdrant on localhost.
+Open http://localhost:5173 — Vite proxies `/api/*` to the standalone API server.
 
 The default admin password in dev mode is `dev`.
 
