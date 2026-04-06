@@ -180,8 +180,8 @@ export function Thread() {
   };
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="flex-1 overflow-y-auto">
+    <div className="flex flex-col min-h-full">
+      <div className="flex-1">
         {messages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-center px-4">
             <h1 className="text-2xl font-bold mb-2">Memory Box</h1>
@@ -269,7 +269,7 @@ export function Thread() {
                     // Render a ToolStrip at the start of each consecutive tool group
                     const group = toolGroupAt.get(i);
                     if (group) {
-                      return <ToolStrip key={`tools-${i}`} tools={group.tools} />;
+                      return <div key={`tools-${i}`} className="my-2"><ToolStrip tools={group.tools} /></div>;
                     }
 
                     return null;
@@ -282,7 +282,7 @@ export function Thread() {
         )}
       </div>
 
-      <div className="shrink-0 max-w-3xl mx-auto w-full pb-4 pt-2 px-4">
+      <div className="shrink-0 max-w-[788px] mx-auto w-full pb-4 px-4 -mt-3 sticky bottom-0 z-10 bg-neutral-950 before:content-[''] before:absolute before:inset-x-0 before:bottom-[calc(100%-0.75rem)] before:h-10 before:bg-gradient-to-t before:from-neutral-950/80 before:to-transparent before:pointer-events-none">
         <div className="relative flex items-end bg-neutral-900 border border-neutral-800 rounded-xl focus-within:border-neutral-600 transition-colors">
           <textarea
             value={input}
