@@ -3,27 +3,33 @@ import { Streamdown } from 'streamdown';
 import 'streamdown/styles.css';
 import { useChat, type ToolCallPart } from '../hooks/useChat';
 
-function getToolLabel(toolName: string, args: Record<string, unknown>): { action: string; detail?: string } {
+function getToolLabel(toolName: string, args: Record<string, unknown>): { action: string; past: string; detail?: string } {
   switch (toolName) {
-    case 'search-memories':
-      return { action: 'Searching memories', detail: args.query as string };
-    case 'store-memory':
-      return { action: 'Saving memory', detail: args.title as string };
-    case 'list-memories': {
+    case 'searchMemories':
+      return { action: 'Searching memories', past: 'Searched memories', detail: args.query as string };
+    case 'storeMemory':
+      return { action: 'Saving memory', past: 'Saved memory', detail: args.title as string };
+    case 'listMemories': {
       const filters = [args.category, args.tag, args.contentType].filter(Boolean) as string[];
-      return { action: 'Browsing memories', detail: filters.length ? filters.join(', ') : undefined };
+      return { action: 'Browsing memories', past: 'Browsed memories', detail: filters.length ? filters.join(', ') : undefined };
     }
-    case 'graph-query': {
+    case 'graphQuery': {
       const context = (args.tag ?? args.category) as string | undefined;
-      return { action: 'Exploring connections', detail: context };
+      return { action: 'Exploring connections', past: 'Explored connections', detail: context };
     }
-    case 'get-memory':
-      return { action: 'Retrieving memory' };
-    case 'delete-memory':
-      return { action: 'Deleting memory' };
+    case 'getMemory':
+      return { action: 'Retrieving memory', past: 'Retrieved memory' };
+    case 'deleteMemory':
+      return { action: 'Deleting memory', past: 'Deleted memory' };
     default:
-      return { action: toolName };
+      return { action: toolName, past: toolName };
   }
+}
+
+function getToolSummary(tools: ToolCallPart[]): string {
+  const pastLabels = [...new Set(tools.map((t) => getToolLabel(t.toolName, t.args).past))];
+  if (pastLabels.length <= 2) return pastLabels.join(' & ');
+  return `${pastLabels.slice(0, -1).join(', ')} & ${pastLabels[pastLabels.length - 1]}`;
 }
 
 function Spinner() {
@@ -36,13 +42,116 @@ function Spinner() {
   );
 }
 
-function ToolIndicator({ tool }: { tool: ToolCallPart }) {
-  const { action, detail } = getToolLabel(tool.toolName, tool.args);
+function ShimmerText({ children }: { children: React.ReactNode }) {
   return (
-    <div className="max-w-[85%] flex items-center gap-2 px-3 py-2 bg-neutral-800/50 border border-neutral-700/50 rounded-lg text-xs text-neutral-400">
-      <span className="font-medium text-neutral-300">{action}</span>
-      {detail && <span className="text-neutral-500 italic truncate max-w-[200px]">"{detail}"</span>}
-      <Spinner />
+    <span
+      className="animate-[shimmer_1.5s_ease-in-out_infinite]"
+      style={{
+        backgroundImage: 'linear-gradient(90deg, #737373 0%, #a3a3a3 40%, #e5e5e5 50%, #a3a3a3 60%, #737373 100%)',
+        backgroundSize: '200% 100%',
+        WebkitBackgroundClip: 'text',
+        backgroundClip: 'text',
+        WebkitTextFillColor: 'transparent',
+      }}
+    >
+      {children}
+    </span>
+  );
+}
+
+function ToolStrip({ tools }: { tools: ToolCallPart[] }) {
+  const [expanded, setExpanded] = useState(false);
+  const [displayedTool, setDisplayedTool] = useState<ToolCallPart | null>(null);
+  const [animating, setAnimating] = useState<'enter' | 'exit' | null>(null);
+  const pendingRef = useRef<ToolCallPart | null>(null);
+
+  const allDone = tools.length > 0 && tools.every((t) => t.done);
+  const activeTool = !allDone ? [...tools].reverse().find((t) => !t.done) ?? null : null;
+
+  // Rotate active tool with enter/exit animation
+  useEffect(() => {
+    if (allDone) return;
+    if (activeTool === displayedTool) return;
+    if (activeTool && !displayedTool) {
+      // First tool — just enter
+      setDisplayedTool(activeTool);
+      setAnimating('enter');
+      const t = setTimeout(() => setAnimating(null), 200);
+      return () => clearTimeout(t);
+    }
+    if (activeTool && displayedTool) {
+      // Swap — exit old, then enter new
+      pendingRef.current = activeTool;
+      setAnimating('exit');
+      const t = setTimeout(() => {
+        setDisplayedTool(pendingRef.current);
+        pendingRef.current = null;
+        setAnimating('enter');
+        setTimeout(() => setAnimating(null), 200);
+      }, 150);
+      return () => clearTimeout(t);
+    }
+  }, [activeTool?.toolCallId, allDone]);
+
+  if (tools.length === 0) return null;
+
+  // All done — show summary with optional dropdown
+  if (allDone) {
+    const summary = getToolSummary(tools);
+    if (tools.length === 1) {
+      const { past, detail } = getToolLabel(tools[0].toolName, tools[0].args);
+      return (
+        <div className="text-xs text-neutral-500 italic">
+          {past}{detail ? ` "${detail}"` : ''}
+        </div>
+      );
+    }
+    return (
+      <div className="text-xs text-neutral-500 italic">
+        <button
+          onClick={() => setExpanded((v) => !v)}
+          className="inline-flex items-center gap-1 hover:text-neutral-400 transition-colors cursor-pointer"
+        >
+          <span>{summary}</span>
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 16 16"
+            fill="currentColor"
+            className={`w-3 h-3 transition-transform ${expanded ? 'rotate-180' : ''}`}
+          >
+            <path fillRule="evenodd" d="M4.22 6.22a.75.75 0 0 1 1.06 0L8 8.94l2.72-2.72a.75.75 0 1 1 1.06 1.06l-3.25 3.25a.75.75 0 0 1-1.06 0L4.22 7.28a.75.75 0 0 1 0-1.06Z" clipRule="evenodd" />
+          </svg>
+        </button>
+        {expanded && (
+          <div className="mt-1 flex flex-col gap-0.5 pl-2 border-l border-neutral-800">
+            {tools.map((t) => {
+              const { past, detail } = getToolLabel(t.toolName, t.args);
+              return (
+                <span key={t.toolCallId}>
+                  {past}{detail ? ` "${detail}"` : ''}
+                </span>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // Streaming — show rotating active tool
+  if (!displayedTool) return null;
+  const { action, detail } = getToolLabel(displayedTool.toolName, displayedTool.args);
+  const animClass =
+    animating === 'enter' ? 'animate-[tool-enter_0.2s_ease-out]' :
+    animating === 'exit' ? 'animate-[tool-exit_0.15s_ease-in_forwards]' : '';
+
+  return (
+    <div className="text-xs italic overflow-hidden h-4">
+      <div className={animClass} key={displayedTool.toolCallId}>
+        <ShimmerText>
+          {action}{detail ? ` "${detail}"` : ''}
+        </ShimmerText>
+      </div>
     </div>
   );
 }
@@ -117,6 +226,23 @@ export function Thread() {
                 }
               }
 
+              // Group consecutive tool-call parts so each group renders as a single ToolStrip
+              // in the correct position between text parts.
+              const toolGroups: { startIndex: number; tools: ToolCallPart[] }[] = [];
+              for (let i = 0; i < message.parts.length; i++) {
+                const part = message.parts[i];
+                if (part.type === 'tool-call') {
+                  const prev = toolGroups[toolGroups.length - 1];
+                  if (prev && prev.startIndex + prev.tools.length === i) {
+                    prev.tools.push(part);
+                  } else {
+                    toolGroups.push({ startIndex: i, tools: [part] });
+                  }
+                }
+              }
+              // Map from part index to the tool group that starts there
+              const toolGroupAt = new Map(toolGroups.map((g) => [g.startIndex, g]));
+
               return (
                 <div key={message.id} className="flex flex-col items-start gap-2 mb-4">
                   {message.parts.map((part, i) => {
@@ -140,8 +266,10 @@ export function Thread() {
                       );
                     }
 
-                    if (part.type === 'tool-call' && !part.done) {
-                      return <ToolIndicator key={part.toolCallId} tool={part} />;
+                    // Render a ToolStrip at the start of each consecutive tool group
+                    const group = toolGroupAt.get(i);
+                    if (group) {
+                      return <ToolStrip key={`tools-${i}`} tools={group.tools} />;
                     }
 
                     return null;
