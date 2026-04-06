@@ -56,31 +56,30 @@ export async function discoverStars(username: string, token?: string): Promise<D
     page++;
   }
 
-  // Check dedup for each public repo via source_url
-  const repos: StarredRepo[] = [];
+  // Batch dedup check: single query instead of N sequential queries
+  const repoUrls = allRepos.map((r: any) => r.html_url);
+  const dedupResult = await query(
+    'SELECT id, source_url FROM memories WHERE source_url = ANY($1)',
+    [repoUrls],
+  );
+  const importedMap = new Map<string, string>();
+  for (const row of dedupResult.rows) {
+    importedMap.set(row.source_url, row.id);
+  }
 
-  for (const repo of allRepos) {
+  const repos: StarredRepo[] = allRepos.map((repo: any) => {
     const repoUrl = repo.html_url;
-    const result = await query('SELECT id FROM memories WHERE source_url = $1', [repoUrl]);
-
-    let alreadyImported = false;
-    let existingMemoryId: string | undefined;
-
-    if (result.rows.length > 0) {
-      alreadyImported = true;
-      existingMemoryId = result.rows[0].id;
-    }
-
-    repos.push({
+    const existingMemoryId = importedMap.get(repoUrl);
+    return {
       url: repoUrl,
       fullName: repo.full_name,
       description: repo.description || '',
       stars: repo.stargazers_count || 0,
       language: repo.language || null,
-      alreadyImported,
+      alreadyImported: !!existingMemoryId,
       existingMemoryId,
-    });
-  }
+    };
+  });
 
   // Get rate limit info
   let rateLimit = { remaining: 0, limit: 0, reset: '' };
@@ -123,82 +122,90 @@ export async function processImportJob(
   repos: string[],
   githubToken?: string,
 ): Promise<void> {
-  const hasToken = !!githubToken;
-  const delayMs = hasToken ? 200 : 3000;
+  const concurrency = githubToken ? 5 : 1;
 
-  for (let i = 0; i < repos.length; i++) {
-    // Check for cancellation
-    const statusResult = await query('SELECT status FROM jobs WHERE id = $1', [jobId]);
-    if (statusResult.rows[0]?.status === 'cancelled') {
-      await query('UPDATE jobs SET completed_at = $1 WHERE id = $2', [new Date().toISOString(), jobId]);
-      return;
-    }
+  // Set token once for the entire job (safe: startImportJob enforces single active job)
+  const originalToken = process.env.GITHUB_TOKEN;
+  if (githubToken) process.env.GITHUB_TOKEN = githubToken;
 
-    const repoUrl = repos[i];
-    await query('UPDATE jobs SET current_item = $1 WHERE id = $2', [repoUrl, jobId]);
+  let cancelled = false;
+  let nextIndex = 0;
 
-    // Temporarily set the GitHub token for the ingest pipeline
-    const originalToken = process.env.GITHUB_TOKEN;
-    if (githubToken) process.env.GITHUB_TOKEN = githubToken;
+  async function worker(): Promise<void> {
+    while (!cancelled) {
+      const i = nextIndex++;
+      if (i >= repos.length) break;
 
-    try {
-      const result = await ingest({ content: repoUrl });
-
-      const entry: ImportJobResult = result.deduplicated
-        ? { repo: repoUrl, status: 'skipped', memoryId: result.existingMemoryId }
-        : { repo: repoUrl, status: 'imported', memoryId: result.memoryId };
-
-      await query('UPDATE jobs SET completed = completed + 1 WHERE id = $1', [jobId]);
-      if (result.deduplicated) {
-        await query('UPDATE jobs SET skipped = skipped + 1 WHERE id = $1', [jobId]);
+      // Check for cancellation
+      const statusResult = await query('SELECT status FROM jobs WHERE id = $1', [jobId]);
+      if (statusResult.rows[0]?.status === 'cancelled') {
+        cancelled = true;
+        await query('UPDATE jobs SET completed_at = $1 WHERE id = $2', [new Date().toISOString(), jobId]);
+        return;
       }
 
-      // Append result to the results JSONB array
-      await query(
-        `UPDATE jobs SET results = results || $1::jsonb WHERE id = $2`,
-        [JSON.stringify([entry]), jobId],
-      );
+      const repoUrl = repos[i];
+      await query('UPDATE jobs SET current_item = $1 WHERE id = $2', [repoUrl, jobId]);
 
-    } catch (err: any) {
-      // Handle rate limiting: wait and retry this repo
-      if (err instanceof GitHubRateLimitError) {
-        const waitMs = Math.max(0, err.resetAt * 1000 - Date.now()) + 1000;
-        await query('UPDATE jobs SET current_item = $1 WHERE id = $2', [
-          `Rate limited — resuming in ${Math.ceil(waitMs / 1000)}s`,
-          jobId,
-        ]);
-        await new Promise((resolve) => setTimeout(resolve, waitMs));
-        i--; // Retry this repo
-        continue;
+      try {
+        const result = await ingest({ content: repoUrl });
+
+        const entry: ImportJobResult = result.deduplicated
+          ? { repo: repoUrl, status: 'skipped', memoryId: result.existingMemoryId }
+          : { repo: repoUrl, status: 'imported', memoryId: result.memoryId };
+
+        await query('UPDATE jobs SET completed = completed + 1 WHERE id = $1', [jobId]);
+        if (result.deduplicated) {
+          await query('UPDATE jobs SET skipped = skipped + 1 WHERE id = $1', [jobId]);
+        }
+
+        await query(
+          `UPDATE jobs SET results = results || $1::jsonb WHERE id = $2`,
+          [JSON.stringify([entry]), jobId],
+        );
+
+      } catch (err: any) {
+        if (err instanceof GitHubRateLimitError) {
+          const waitMs = Math.max(0, err.resetAt * 1000 - Date.now()) + 1000;
+          await query('UPDATE jobs SET current_item = $1 WHERE id = $2', [
+            `Rate limited — resuming in ${Math.ceil(waitMs / 1000)}s`,
+            jobId,
+          ]);
+          await new Promise((resolve) => setTimeout(resolve, waitMs));
+          nextIndex--; // Put this slot back for retry
+          continue;
+        }
+
+        console.error(`Import failed for ${repoUrl}:`, err.message, err.stack?.split('\n').slice(0, 3).join('\n'));
+
+        await query('UPDATE jobs SET completed = completed + 1, failed = failed + 1 WHERE id = $1', [jobId]);
+
+        await query(
+          `UPDATE jobs SET results = results || $1::jsonb WHERE id = $2`,
+          [JSON.stringify([{ repo: repoUrl, status: 'failed', error: err.message }]), jobId],
+        );
       }
-
-      console.error(`Import failed for ${repoUrl}:`, err.message, err.stack?.split('\n').slice(0, 3).join('\n'));
-
-      await query('UPDATE jobs SET completed = completed + 1, failed = failed + 1 WHERE id = $1', [jobId]);
-
-      await query(
-        `UPDATE jobs SET results = results || $1::jsonb WHERE id = $2`,
-        [JSON.stringify([{ repo: repoUrl, status: 'failed', error: err.message }]), jobId],
-      );
-    } finally {
-      // Restore original token
-      if (githubToken) {
-        if (originalToken) process.env.GITHUB_TOKEN = originalToken;
-        else delete process.env.GITHUB_TOKEN;
-      }
-    }
-
-    // Rate limit courtesy delay
-    if (i < repos.length - 1) {
-      await new Promise((resolve) => setTimeout(resolve, delayMs));
     }
   }
 
-  // Mark complete
-  await query(
-    `UPDATE jobs SET status = 'completed', completed_at = $1, current_item = '' WHERE id = $2`,
-    [new Date().toISOString(), jobId],
-  );
+  try {
+    await Promise.all(
+      Array.from({ length: Math.min(concurrency, repos.length) }, () => worker()),
+    );
+
+    // Mark complete (unless cancelled)
+    if (!cancelled) {
+      await query(
+        `UPDATE jobs SET status = 'completed', completed_at = $1, current_item = '' WHERE id = $2`,
+        [new Date().toISOString(), jobId],
+      );
+    }
+  } finally {
+    if (githubToken) {
+      if (originalToken) process.env.GITHUB_TOKEN = originalToken;
+      else delete process.env.GITHUB_TOKEN;
+    }
+  }
 }
 
 /**
