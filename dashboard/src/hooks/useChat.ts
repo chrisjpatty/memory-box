@@ -11,6 +11,7 @@ export interface ToolCallPart {
   toolName: string;
   args: Record<string, unknown>;
   done: boolean;
+  output?: unknown;
 }
 
 export type MessagePart = TextPart | ToolCallPart;
@@ -225,7 +226,7 @@ export function useChat() {
                     (p): p is ToolCallPart =>
                       p.type === 'tool-call' && p.toolCallId === parsed.toolCallId,
                   );
-                  if (tool) tool.done = true;
+                  if (tool) { tool.done = true; tool.output = parsed.output; }
                   flushToState();
                   break;
                 }

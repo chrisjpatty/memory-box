@@ -20,7 +20,7 @@ export function Layout() {
 
   return (
     <div className="h-screen flex overflow-hidden">
-      <aside className="w-56 bg-neutral-900 border-r border-neutral-800 p-4 flex flex-col overflow-y-auto">
+      <aside className="fixed top-0 left-0 w-56 h-screen bg-neutral-900 border-r border-neutral-800 p-4 flex flex-col overflow-y-auto z-10">
         <h1 className="text-lg font-bold mb-8 px-2">Memory Box</h1>
         <nav className="flex flex-col gap-1 flex-1">
           {navItems.map((item) => (
@@ -47,7 +47,7 @@ export function Layout() {
           Logout
         </button>
       </aside>
-      <main className="flex-1 min-h-0 pt-8 px-8 overflow-auto">
+      <main className="ml-56 flex-1 min-h-0 pt-8 px-8 overflow-auto">
         <Outlet />
       </main>
     </div>
