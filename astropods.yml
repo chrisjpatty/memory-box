@@ -29,10 +29,21 @@ models:
 
 knowledge:
   db:
-    provider: postgres
-    persistent: true
     container:
       image: pgvector/pgvector:pg17
+      port: 5432
+      volume: /var/lib/postgresql/data
+    persistent: true
+    inputs:
+      - name: POSTGRES_USER
+        datatype: string
+        default: postgres
+      - name: POSTGRES_PASSWORD
+        datatype: string
+        default: postgres
+      - name: POSTGRES_DB
+        datatype: string
+        default: memory_box
   files:
     container:
       build:

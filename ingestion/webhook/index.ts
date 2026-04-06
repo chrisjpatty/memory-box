@@ -11,6 +11,7 @@ import { memories } from './api/memories';
 import { search } from './api/search';
 import { ingestApi } from './api/ingest';
 import { importApi } from './api/import';
+import { chat } from './api/chat';
 import { startAutoSync } from '../../lib/import/github-stars';
 import type { IngestRequest } from '../../lib/types';
 
@@ -39,6 +40,7 @@ app.route('/api/memories', memories);
 app.route('/api/search', search);
 app.route('/api/ingest', ingestApi);
 app.route('/api/import', importApi);
+app.route('/api/chat', chat);
 
 // --- Ingestion routes (bearer token auth) ---
 

@@ -2,11 +2,12 @@ import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { api } from '../api';
 
 const navItems = [
-  { to: '/', label: 'Dashboard', end: true },
+  { to: '/', label: 'Chat', end: true },
   { to: '/memories', label: 'Memories' },
   { to: '/search', label: 'Search' },
   { to: '/ingest', label: 'Ingest' },
   { to: '/import', label: 'Import' },
+  { to: '/settings', label: 'Settings' },
 ];
 
 export function Layout() {
