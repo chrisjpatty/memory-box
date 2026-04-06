@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, type KeyboardEvent } from 'react';
 import { Streamdown } from 'streamdown';
 import 'streamdown/styles.css';
-import { useChat, type ActiveTool } from '../hooks/useChat';
+import { useChat, type ToolCallPart } from '../hooks/useChat';
 
 function getToolLabel(toolName: string, args: Record<string, unknown>): { action: string; detail?: string } {
   switch (toolName) {
@@ -36,7 +36,7 @@ function Spinner() {
   );
 }
 
-function ToolIndicator({ tool }: { tool: ActiveTool }) {
+function ToolIndicator({ tool }: { tool: ToolCallPart }) {
   const { action, detail } = getToolLabel(tool.toolName, tool.args);
   return (
     <div className="max-w-[85%] flex items-center gap-2 px-3 py-2 bg-neutral-800/50 border border-neutral-700/50 rounded-lg text-xs text-neutral-400">
@@ -48,13 +48,13 @@ function ToolIndicator({ tool }: { tool: ActiveTool }) {
 }
 
 export function Thread() {
-  const { messages, isStreaming, activeTools, send } = useChat();
+  const { messages, isStreaming, send } = useChat();
   const [input, setInput] = useState('');
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, activeTools]);
+  }, [messages]);
 
   const handleSubmit = () => {
     const text = input.trim();
@@ -94,30 +94,58 @@ export function Thread() {
               }
 
               const isLast = message === messages[messages.length - 1];
-              const isAnimating = isStreaming && isLast;
-              const hasText = message.content.trim().length > 0;
+              const isMessageStreaming = isStreaming && isLast;
+              const hasParts = message.parts.length > 0;
 
-              return (
-                <div key={message.id} className="flex flex-col items-start gap-2 mb-4">
-                  {!hasText && isAnimating ? (
+              // Show loading spinner if streaming but no parts yet
+              if (!hasParts && isMessageStreaming) {
+                return (
+                  <div key={message.id} className="flex flex-col items-start gap-2 mb-4">
                     <div className="max-w-[85%] rounded-2xl px-4 py-3 bg-neutral-900 border border-neutral-800">
                       <Spinner />
                     </div>
-                  ) : hasText ? (
-                    <div className="max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed bg-neutral-900 border border-neutral-800 text-neutral-300">
-                      <Streamdown
-                        animated={{ animation: 'fadeIn', duration: 150, easing: 'ease', sep: 'word' }}
-                        isAnimating={isAnimating}
-                        linkSafety={{ enabled: false }}
-                      >
-                        {message.content.trim()}
-                      </Streamdown>
-                    </div>
-                  ) : null}
+                  </div>
+                );
+              }
 
-                  {isAnimating && activeTools.map((tool) => (
-                    <ToolIndicator key={tool.toolCallId} tool={tool} />
-                  ))}
+              // Find the last text part index to know which one is actively streaming
+              let lastTextIndex = -1;
+              for (let i = message.parts.length - 1; i >= 0; i--) {
+                if (message.parts[i].type === 'text') {
+                  lastTextIndex = i;
+                  break;
+                }
+              }
+
+              return (
+                <div key={message.id} className="flex flex-col items-start gap-2 mb-4">
+                  {message.parts.map((part, i) => {
+                    if (part.type === 'text') {
+                      const text = part.content.trim();
+                      if (!text) return null;
+
+                      const isLastText = i === lastTextIndex;
+                      const isPartAnimating = isMessageStreaming && isLastText;
+
+                      return (
+                        <div key={`text-${i}`} className="max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed bg-neutral-900 border border-neutral-800 text-neutral-300">
+                          <Streamdown
+                            animated={{ animation: 'fadeIn', duration: 150, easing: 'ease', sep: 'word' }}
+                            isAnimating={isPartAnimating}
+                            linkSafety={{ enabled: false }}
+                          >
+                            {text}
+                          </Streamdown>
+                        </div>
+                      );
+                    }
+
+                    if (part.type === 'tool-call' && !part.done) {
+                      return <ToolIndicator key={part.toolCallId} tool={part} />;
+                    }
+
+                    return null;
+                  })}
                 </div>
               );
             })}
