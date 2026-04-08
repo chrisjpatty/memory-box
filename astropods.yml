@@ -50,6 +50,8 @@ knowledge:
         context: .
         dockerfile: minio.Dockerfile
       port: 9000
+      volume: /data
+    persistent: true
 
 ingestion:
   webhook:

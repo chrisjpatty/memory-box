@@ -48,11 +48,11 @@ export function MemoryList() {
 
   const loading = isSearching ? search.isPending : infiniteMemories.isLoading;
 
-  // Debounced search
-  useEffect(() => {
+  const handleSearchChange = (value: string) => {
+    setSearchQuery(value);
     if (searchTimeout.current) clearTimeout(searchTimeout.current);
     searchTimeout.current = setTimeout(() => {
-      const q = searchQuery.trim();
+      const q = value.trim();
       if (!q) {
         setSearchResults(null);
         return;
@@ -61,8 +61,7 @@ export function MemoryList() {
         onSuccess: (r) => setSearchResults(r.results.map(toCardData)),
       });
     }, 300);
-    return () => { if (searchTimeout.current) clearTimeout(searchTimeout.current); };
-  }, [searchQuery, search]);
+  };
 
   // Infinite scroll
   const loadMoreRef = useRef(() => {});
@@ -102,7 +101,7 @@ export function MemoryList() {
           <input
             type="text"
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e) => handleSearchChange(e.target.value)}
             placeholder="Search memories..."
             className="flex-1 px-3 py-2 bg-neutral-900 border border-neutral-800 rounded-lg text-sm text-neutral-200 placeholder-neutral-600 focus:outline-none focus:border-neutral-600 transition-colors"
           />
