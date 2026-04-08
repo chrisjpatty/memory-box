@@ -4,30 +4,46 @@ import Prism from 'prismjs';
 import 'prismjs/components/prism-json';
 import 'prismjs/themes/prism-tomorrow.css';
 
-type ConfigTab = 'claude' | 'vscode' | 'generic';
+type ConfigTab = 'claude-web' | 'claude-desktop' | 'vscode' | 'generic';
 
 function McpConfigSnippets({ token, mcpUrl }: { token: string; mcpUrl: string }) {
-  const [tab, setTab] = useState<ConfigTab>('claude');
+  const [tab, setTab] = useState<ConfigTab>('claude-web');
   const codeRef = useRef<HTMLElement>(null);
   const [copied, setCopied] = useState(false);
 
-  const snippets: Record<ConfigTab, { label: string; code: string }> = {
-    claude: {
+  const snippets: Record<ConfigTab, { label: string; code: string; lang: string; note?: string }> = {
+    'claude-web': {
+      label: 'Claude.ai',
+      lang: 'json',
+      note: 'Go to Settings \u2192 Connectors \u2192 Add custom connector, then paste the URL below.',
+      code: mcpUrl,
+    },
+    'claude-desktop': {
       label: 'Claude Desktop',
+      lang: 'json',
+      note: 'Add to claude_desktop_config.json. Requires Node.js 18+.',
+      // Claude Desktop config only supports stdio; use mcp-remote as a bridge
       code: JSON.stringify({
         mcpServers: {
           'memory-box': {
-            url: mcpUrl,
-            headers: { Authorization: `Bearer ${token}` },
+            command: 'npx',
+            args: [
+              '-y', 'mcp-remote',
+              mcpUrl,
+              '--header', `Authorization: Bearer ${token}`,
+            ],
           },
         },
       }, null, 2),
     },
     vscode: {
       label: 'VS Code',
+      lang: 'json',
+      note: 'Add to .vscode/mcp.json in your project.',
       code: JSON.stringify({
         servers: {
           'memory-box': {
+            type: 'http',
             url: mcpUrl,
             headers: { Authorization: `Bearer ${token}` },
           },
@@ -36,6 +52,8 @@ function McpConfigSnippets({ token, mcpUrl }: { token: string; mcpUrl: string })
     },
     generic: {
       label: 'Generic',
+      lang: 'json',
+      note: 'For other MCP clients that support Streamable HTTP.',
       code: JSON.stringify({
         url: mcpUrl,
         transport: 'streamable-http',
@@ -56,11 +74,13 @@ function McpConfigSnippets({ token, mcpUrl }: { token: string; mcpUrl: string })
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const tabKeys: ConfigTab[] = ['claude-web', 'claude-desktop', 'vscode', 'generic'];
+
   return (
     <div className="rounded-lg border border-neutral-800 overflow-hidden">
       <div className="flex items-center justify-between bg-neutral-900/80 border-b border-neutral-800 px-1">
         <div className="flex">
-          {(['claude', 'vscode', 'generic'] as ConfigTab[]).map((key) => (
+          {tabKeys.map((key) => (
             <button
               key={key}
               onClick={() => setTab(key)}
@@ -83,8 +103,13 @@ function McpConfigSnippets({ token, mcpUrl }: { token: string; mcpUrl: string })
           {copied ? 'Copied!' : 'Copy'}
         </button>
       </div>
+      {active.note && (
+        <div className="px-4 py-2 bg-neutral-900/40 border-b border-neutral-800 text-xs text-neutral-500">
+          {active.note}
+        </div>
+      )}
       <pre className="!m-0 !rounded-none !bg-neutral-950 p-4 overflow-x-auto">
-        <code ref={codeRef} className="language-json !text-[13px] !leading-relaxed">
+        <code ref={codeRef} className={`language-${active.lang} !text-[13px] !leading-relaxed`}>
           {active.code}
         </code>
       </pre>
