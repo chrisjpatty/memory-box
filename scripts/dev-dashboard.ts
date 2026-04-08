@@ -32,6 +32,9 @@ import { conversations } from '../ingestion/webhook/api/conversations';
 import { jobsApi } from '../ingestion/webhook/api/jobs';
 import { initDatabase } from '../lib/db-init';
 import { initJobSystem } from '../lib/jobs/init';
+import { validateToken } from '../lib/auth';
+import { createMcpHandler } from '../mcp/server';
+import { mcpSettings } from '../ingestion/webhook/api/mcp-settings';
 
 // Load secrets from ast project config
 try {
@@ -160,6 +163,24 @@ app.route('/api/import', importApi);
 app.route('/api/jobs', jobsApi);
 app.route('/api/conversations', conversations);
 app.route('/api/chat', chat);
+app.route('/api/mcp', mcpSettings);
+
+// --- MCP Server (bearer token auth) ---
+
+const mcpBearerAuth = async (c: any, next: any) => {
+  const authHeader = c.req.header('Authorization');
+  if (!authHeader?.startsWith('Bearer ')) {
+    return c.json({ error: 'Missing or invalid Authorization header' }, 401);
+  }
+  const valid = await validateToken(authHeader.slice(7));
+  if (!valid) {
+    return c.json({ error: 'Invalid token' }, 401);
+  }
+  await next();
+};
+
+const mcpHandler = createMcpHandler();
+app.all('/mcp', mcpBearerAuth, (c) => mcpHandler(c));
 
 // Initialize database and job system
 await initDatabase();

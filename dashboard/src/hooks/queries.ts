@@ -16,6 +16,7 @@ export const queryKeys = {
   githubToken: ['github', 'token'] as const,
   syncStatus: ['github', 'sync'] as const,
   twitterStatus: ['twitter', 'status'] as const,
+  mcpStatus: ['mcp', 'status'] as const,
   activeJob: (type: string) => ['jobs', 'active', type] as const,
   jobStatus: (jobId: string) => ['jobs', jobId] as const,
   activeJobs: ['jobs', 'active'] as const,
@@ -205,6 +206,37 @@ export function useIngest() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['memories'] });
       qc.invalidateQueries({ queryKey: queryKeys.stats });
+    },
+  });
+}
+
+// --- MCP Server ---
+
+export function useMcpStatus() {
+  return useQuery({
+    queryKey: queryKeys.mcpStatus,
+    queryFn: () => api.mcpStatus(),
+  });
+}
+
+export function useEnableMcp() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.mcpEnable(),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.mcpStatus });
+      qc.invalidateQueries({ queryKey: queryKeys.tokens });
+    },
+  });
+}
+
+export function useDisableMcp() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.mcpDisable(),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.mcpStatus });
+      qc.invalidateQueries({ queryKey: queryKeys.tokens });
     },
   });
 }

@@ -91,6 +91,14 @@ export const api = {
   getTwitterFolders: () =>
     request<{ folders: { id: string; name: string }[] }>('/api/import/twitter/folders'),
 
+  // MCP Server
+  mcpStatus: () =>
+    request<{ enabled: boolean; tokenHint?: string; tokenId?: number }>('/api/mcp/status'),
+  mcpEnable: () =>
+    request<{ success: boolean; token: string }>('/api/mcp/enable', { method: 'POST' }),
+  mcpDisable: () =>
+    request<{ success: boolean }>('/api/mcp/disable', { method: 'POST' }),
+
   // Conversations
   listConversations: () =>
     request<{ conversations: { id: string; title: string; created_at: string; updated_at: string }[] }>('/api/conversations'),

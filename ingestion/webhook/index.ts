@@ -16,6 +16,8 @@ import { conversations } from './api/conversations';
 import { jobsApi } from './api/jobs';
 import { initJobSystem } from '../../lib/jobs/init';
 import type { IngestRequest } from '../../lib/types';
+import { createMcpHandler } from '../../mcp/server';
+import { mcpSettings } from './api/mcp-settings';
 
 const app = new Hono();
 
@@ -46,6 +48,7 @@ app.route('/api/import', importApi);
 app.route('/api/jobs', jobsApi);
 app.route('/api/conversations', conversations);
 app.route('/api/chat', chat);
+app.route('/api/mcp', mcpSettings);
 
 // --- Ingestion routes (bearer token auth) ---
 
@@ -126,6 +129,11 @@ app.post('/ingest/batch', bearerAuth, async (c) => {
   );
   return c.json({ results: response }, 201);
 });
+
+// --- MCP Server (bearer token auth) ---
+
+const mcpHandler = createMcpHandler();
+app.all('/mcp', bearerAuth, (c) => mcpHandler(c));
 
 // --- Dashboard SPA (static files in production) ---
 

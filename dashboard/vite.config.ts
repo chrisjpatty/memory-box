@@ -17,6 +17,10 @@ export default defineConfig({
       '/api': {
         target: 'http://localhost:3002',
         timeout: 120000 // 2 minutes for slow operations like image ingestion
+      },
+      '/mcp': {
+        target: 'http://localhost:3002',
+        timeout: 120000
       }
     }
   },

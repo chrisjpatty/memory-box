@@ -3,6 +3,7 @@ import { Outlet, NavLink } from 'react-router-dom';
 const navItems = [
   { to: '/settings', label: 'General', end: true },
   { to: '/settings/tokens', label: 'API Tokens' },
+  { to: '/settings/mcp', label: 'MCP Server' },
   { to: '/settings/danger-zone', label: 'Danger Zone', danger: true },
 ];
 

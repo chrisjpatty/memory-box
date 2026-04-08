@@ -13,6 +13,7 @@ import { SettingsLayout } from './pages/settings/SettingsLayout';
 import { General } from './pages/settings/General';
 import { Tokens } from './pages/settings/Tokens';
 import { DangerZone } from './pages/settings/DangerZone';
+import { McpServer } from './pages/settings/McpServer';
 
 export default function App() {
   return (
@@ -31,6 +32,7 @@ export default function App() {
           <Route path="settings" element={<SettingsLayout />}>
             <Route index element={<General />} />
             <Route path="tokens" element={<Tokens />} />
+            <Route path="mcp" element={<McpServer />} />
             <Route path="danger-zone" element={<DangerZone />} />
           </Route>
         </Route>
