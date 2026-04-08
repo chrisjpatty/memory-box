@@ -1,6 +1,6 @@
 /**
- * Authentication: bearer tokens and timing-safe comparison.
- * Backed by PostgreSQL auth_tokens table.
+ * Authentication: bearer tokens, password hashing, and timing-safe comparison.
+ * Backed by PostgreSQL auth_tokens + settings tables.
  */
 import { createHash, timingSafeEqual } from 'crypto';
 import { nanoid } from 'nanoid';
@@ -17,6 +17,34 @@ export function safeCompare(a: string, b: string): boolean {
   const bufA = createHash('sha256').update(a).digest();
   const bufB = createHash('sha256').update(b).digest();
   return timingSafeEqual(bufA, bufB);
+}
+
+// --- Admin password (bcrypt, stored in settings table) ---
+
+const BCRYPT_COST = 12;
+
+export async function hashPassword(password: string): Promise<string> {
+  return Bun.password.hash(password, { algorithm: 'bcrypt', cost: BCRYPT_COST });
+}
+
+export async function verifyPassword(password: string, hash: string): Promise<boolean> {
+  return Bun.password.verify(password, hash);
+}
+
+export async function getPasswordHash(): Promise<string | null> {
+  const result = await query(
+    `SELECT value FROM settings WHERE key = $1`,
+    ['password_hash'],
+  );
+  return result.rows[0]?.value ?? null;
+}
+
+export async function setPasswordHash(hash: string): Promise<void> {
+  await query(
+    `INSERT INTO settings (key, value, updated_at) VALUES ($1, $2, NOW())
+     ON CONFLICT (key) DO UPDATE SET value = $2, updated_at = NOW()`,
+    ['password_hash', hash],
+  );
 }
 
 export async function generateToken(name: string): Promise<string> {

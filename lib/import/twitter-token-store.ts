@@ -8,8 +8,8 @@ const SCOPES = 'bookmark.read tweet.read users.read offline.access';
 // --- Encryption (same pattern as GitHub token store, different salt) ---
 
 function getEncryptionKey(): Buffer {
-  const secret = process.env.ENCRYPTION_KEY || process.env.ADMIN_PASSWORD;
-  if (!secret) throw new Error('No ENCRYPTION_KEY or ADMIN_PASSWORD set for token encryption');
+  const secret = process.env.ENCRYPTION_KEY;
+  if (!secret) throw new Error('ENCRYPTION_KEY is required for token encryption');
   return scryptSync(secret, 'memory-box-twitter-token', 32);
 }
 

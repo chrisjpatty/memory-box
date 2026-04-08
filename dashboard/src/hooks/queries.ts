@@ -72,13 +72,30 @@ export function useAuthStatus() {
   });
 }
 
+export function useSetup() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (password: string) => api.setup(password),
+    onSuccess: () => {
+      qc.setQueryData(queryKeys.authStatus, { authenticated: true, setupRequired: false });
+    },
+  });
+}
+
 export function useLogin() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (password: string) => api.login(password),
     onSuccess: () => {
-      qc.setQueryData(queryKeys.authStatus, { authenticated: true });
+      qc.setQueryData(queryKeys.authStatus, { authenticated: true, setupRequired: false });
     },
+  });
+}
+
+export function useChangePassword() {
+  return useMutation({
+    mutationFn: ({ currentPassword, newPassword }: { currentPassword: string; newPassword: string }) =>
+      api.changePassword(currentPassword, newPassword),
   });
 }
 

@@ -1,10 +1,9 @@
 import { Hono } from 'hono';
-import { safeCompare } from '../../../lib/auth';
+import { hashPassword, verifyPassword, getPasswordHash, setPasswordHash } from '../../../lib/auth';
 import { createSession, validateSession, destroySession } from '../dashboard/session';
 
 const auth = new Hono();
 
-const ADMIN_PASSWORD = () => process.env.ADMIN_PASSWORD;
 const MAX_ATTEMPTS = 5;
 const LOCKOUT_SECONDS = 300;
 
@@ -51,7 +50,26 @@ function clearAttempts(ip: string): void {
 
 auth.get('/status', async (c) => {
   const authenticated = await validateSession(c);
-  return c.json({ authenticated });
+  const hash = await getPasswordHash();
+  return c.json({ authenticated, setupRequired: !hash });
+});
+
+auth.post('/setup', async (c) => {
+  const existing = await getPasswordHash();
+  if (existing) {
+    return c.json({ error: 'Password is already configured.' }, 400);
+  }
+
+  const { password } = await c.req.json<{ password: string }>();
+
+  if (!password || password.length < 8) {
+    return c.json({ error: 'Password must be at least 8 characters.' }, 400);
+  }
+
+  const hash = await hashPassword(password);
+  await setPasswordHash(hash);
+  await createSession(c);
+  return c.json({ ok: true });
 });
 
 auth.post('/login', async (c) => {
@@ -64,17 +82,49 @@ auth.post('/login', async (c) => {
 
   const { password } = await c.req.json<{ password: string }>();
 
-  if (!ADMIN_PASSWORD()) {
-    return c.json({ error: 'Admin password is not configured.' }, 500);
+  const hash = await getPasswordHash();
+  if (!hash) {
+    return c.json({ error: 'No password configured. Please complete setup first.' }, 400);
   }
 
-  if (!safeCompare(password, ADMIN_PASSWORD()!)) {
+  const valid = await verifyPassword(password, hash);
+  if (!valid) {
     recordFailedAttempt(ip);
     return c.json({ error: 'Invalid password.' }, 401);
   }
 
   clearAttempts(ip);
   await createSession(c);
+  return c.json({ ok: true });
+});
+
+auth.post('/change-password', async (c) => {
+  const authenticated = await validateSession(c);
+  if (!authenticated) {
+    return c.json({ error: 'Unauthorized' }, 401);
+  }
+
+  const { currentPassword, newPassword } = await c.req.json<{
+    currentPassword: string;
+    newPassword: string;
+  }>();
+
+  const hash = await getPasswordHash();
+  if (!hash) {
+    return c.json({ error: 'No password configured.' }, 400);
+  }
+
+  const valid = await verifyPassword(currentPassword, hash);
+  if (!valid) {
+    return c.json({ error: 'Current password is incorrect.' }, 401);
+  }
+
+  if (!newPassword || newPassword.length < 8) {
+    return c.json({ error: 'New password must be at least 8 characters.' }, 400);
+  }
+
+  const newHash = await hashPassword(newPassword);
+  await setPasswordHash(newHash);
   return c.json({ ok: true });
 });
 

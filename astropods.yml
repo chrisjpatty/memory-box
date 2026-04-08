@@ -7,10 +7,10 @@ agent:
     context: .
     dockerfile: Dockerfile
   inputs:
-    - name: ADMIN_PASSWORD
+    - name: ENCRYPTION_KEY
       datatype: string
       secret: true
-      description: Password for the Memory Box admin dashboard (token management)
+      description: Secret key used to encrypt stored third-party tokens (GitHub, Twitter)
     - name: MINIO_ROOT_USER
       datatype: string
       description: MinIO root username for file storage

@@ -180,8 +180,9 @@ The core pipeline. Accepts content, detects its type, deduplicates, classifies v
 ### 7.2 Session Auth (Dashboard)
 - Cookie-based: `mb_session={sessionId}`, HttpOnly, SameSite=Lax
 - 24-hour TTL, server-side in Redis
-- Password login against `ADMIN_PASSWORD` env var
-- Timing-safe password comparison
+- Password stored as bcrypt hash in PostgreSQL `settings` table
+- First-run setup flow prompts user to create a password
+- Change password available in Settings
 
 ### 7.3 Rate Limiting
 - Login: 5 attempts per IP, 5-minute lockout
@@ -241,7 +242,7 @@ The core pipeline. Accepts content, detects its type, deduplicates, classifies v
 ### 10.3 Deployment
 - Astropods platform with Docker containers
 - Config: `astropods.yml`
-- Secrets: ADMIN_PASSWORD, ANTHROPIC_API_KEY, MINIO_ROOT_PASSWORD
+- Secrets: ENCRYPTION_KEY, ANTHROPIC_API_KEY, MINIO_ROOT_PASSWORD
 
 ### 10.4 Observability
 - OpenTelemetry tracing via @mastra/observability

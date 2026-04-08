@@ -10,24 +10,40 @@ mock.module('../../../../lib/db', () => ({
 }));
 
 const { auth } = await import('../../../../ingestion/webhook/api/auth');
+const { hashPassword } = await import('../../../../lib/auth');
 
 const TEST_PASSWORD = 'test-admin-password';
+
+async function seedPassword(password: string) {
+  const hash = await hashPassword(password);
+  mockPool.settings.set('password_hash', hash);
+}
 
 describe('auth routes', () => {
   beforeEach(() => {
     mockPool.reset();
-    process.env.ADMIN_PASSWORD = TEST_PASSWORD;
   });
 
   describe('GET /status', () => {
-    test('without session cookie → not authenticated', async () => {
+    test('no password set → setupRequired true', async () => {
       const res = await auth.request('/status');
       expect(res.status).toBe(200);
       const body = await res.json();
       expect(body.authenticated).toBe(false);
+      expect(body.setupRequired).toBe(true);
     });
 
-    test('with valid session cookie → authenticated', async () => {
+    test('password set, no session → setupRequired false, not authenticated', async () => {
+      await seedPassword(TEST_PASSWORD);
+      const res = await auth.request('/status');
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.authenticated).toBe(false);
+      expect(body.setupRequired).toBe(false);
+    });
+
+    test('with valid session → authenticated', async () => {
+      await seedPassword(TEST_PASSWORD);
       const sessionId = 'test-session-123';
       const expiresAt = new Date(Date.now() + 86400_000).toISOString();
       mockPool.sessions.set(sessionId, { id: sessionId, expires_at: expiresAt });
@@ -38,20 +54,48 @@ describe('auth routes', () => {
       expect(res.status).toBe(200);
       const body = await res.json();
       expect(body.authenticated).toBe(true);
+      expect(body.setupRequired).toBe(false);
     });
+  });
 
-    test('with invalid session cookie → not authenticated', async () => {
-      const res = await auth.request('/status', {
-        headers: { Cookie: 'mb_session=nonexistent' },
+  describe('POST /setup', () => {
+    test('sets initial password and creates session', async () => {
+      const res = await auth.request('/setup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: TEST_PASSWORD }),
       });
       expect(res.status).toBe(200);
       const body = await res.json();
-      expect(body.authenticated).toBe(false);
+      expect(body.ok).toBe(true);
+      expect(mockPool.settings.has('password_hash')).toBe(true);
+      const setCookie = res.headers.get('Set-Cookie');
+      expect(setCookie).toContain('mb_session=');
+    });
+
+    test('rejects if password already exists', async () => {
+      await seedPassword(TEST_PASSWORD);
+      const res = await auth.request('/setup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: 'new-password-123' }),
+      });
+      expect(res.status).toBe(400);
+    });
+
+    test('rejects password shorter than 8 characters', async () => {
+      const res = await auth.request('/setup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: 'short' }),
+      });
+      expect(res.status).toBe(400);
     });
   });
 
   describe('POST /login', () => {
     test('correct password → 200 with session cookie', async () => {
+      await seedPassword(TEST_PASSWORD);
       const res = await auth.request('/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -66,6 +110,7 @@ describe('auth routes', () => {
     });
 
     test('wrong password → 401', async () => {
+      await seedPassword(TEST_PASSWORD);
       const res = await auth.request('/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -74,7 +119,17 @@ describe('auth routes', () => {
       expect(res.status).toBe(401);
     });
 
+    test('no password configured → 400', async () => {
+      const res = await auth.request('/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: 'anything' }),
+      });
+      expect(res.status).toBe(400);
+    });
+
     test('repeated wrong attempts → 429 after max attempts', async () => {
+      await seedPassword(TEST_PASSWORD);
       for (let i = 0; i < 5; i++) {
         await auth.request('/login', {
           method: 'POST',
@@ -88,16 +143,6 @@ describe('auth routes', () => {
         body: JSON.stringify({ password: 'wrong' }),
       });
       expect(res.status).toBe(429);
-    });
-
-    test('no ADMIN_PASSWORD configured → 500', async () => {
-      delete process.env.ADMIN_PASSWORD;
-      const res = await auth.request('/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password: 'anything' }),
-      });
-      expect(res.status).toBe(500);
     });
   });
 

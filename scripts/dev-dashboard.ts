@@ -53,7 +53,7 @@ try {
 process.env.POSTGRES_DB ??= 'memory_box';
 process.env.POSTGRES_USER ??= 'postgres';
 process.env.POSTGRES_PASSWORD ??= 'postgres';
-process.env.ADMIN_PASSWORD ??= 'dev';
+process.env.ENCRYPTION_KEY ??= 'dev-encryption-key';
 
 // MinIO defaults
 process.env.MINIO_HOST = 'localhost';
@@ -169,7 +169,6 @@ initJobSystem();
 
 const port = parseInt(process.env.PORT || '3002', 10);
 console.log(`\n  Dashboard API server: http://localhost:${port}`);
-console.log(`  Admin password: ${process.env.ADMIN_PASSWORD}`);
 console.log(`\n  Now run: cd dashboard && bun run dev\n`);
 
 export default { port, fetch: app.fetch };
