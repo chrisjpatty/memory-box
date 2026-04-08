@@ -3,6 +3,40 @@ import { query } from '../db';
 import { getJobHandler } from './registry';
 import type { JobContext, JobRecord, JobStatus } from './types';
 
+const STALE_JOB_THRESHOLD_MS = 2 * 60 * 60 * 1000; // 2 hours
+
+// Track jobs that are actually being processed in this server instance
+const activeJobIds = new Set<string>();
+
+/**
+ * Recover orphaned jobs that are stuck in 'running' status from a previous
+ * server instance (e.g., after a restart or crash). Any job marked 'running'
+ * that isn't tracked by this process is assumed orphaned.
+ */
+export async function recoverStaleJobs(): Promise<number> {
+  const result = await query(
+    `UPDATE jobs
+     SET status = 'failed',
+         error = 'Job orphaned by server restart',
+         completed_at = $1
+     WHERE status = 'running'
+       AND started_at < $2
+     RETURNING id, type`,
+    [
+      new Date().toISOString(),
+      new Date(Date.now() - STALE_JOB_THRESHOLD_MS).toISOString(),
+    ],
+  );
+
+  if (result.rows.length > 0) {
+    console.warn(
+      `Recovered ${result.rows.length} stale job(s):`,
+      result.rows.map((r: any) => `${r.type}/${r.id}`).join(', '),
+    );
+  }
+  return result.rows.length;
+}
+
 export async function createJob(type: string, payload: any = {}): Promise<string> {
   const handler = getJobHandler(type);
 
@@ -24,13 +58,18 @@ export async function createJob(type: string, payload: any = {}): Promise<string
   );
 
   // Fire and forget
-  processJob(jobId, handler, payload).catch(async (err) => {
-    console.error(`Job ${jobId} (${type}) failed:`, err);
-    await query(
-      `UPDATE jobs SET status = 'failed', error = $1, completed_at = $2 WHERE id = $3`,
-      [err.message, new Date().toISOString(), jobId],
-    );
-  });
+  activeJobIds.add(jobId);
+  processJob(jobId, handler, payload)
+    .catch(async (err) => {
+      console.error(`Job ${jobId} (${type}) failed:`, err);
+      await query(
+        `UPDATE jobs SET status = 'failed', error = $1, completed_at = $2 WHERE id = $3`,
+        [err.message, new Date().toISOString(), jobId],
+      );
+    })
+    .finally(() => {
+      activeJobIds.delete(jobId);
+    });
 
   return jobId;
 }

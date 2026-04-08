@@ -4,7 +4,6 @@ import { useLogout, useConversations, useDeleteConversation } from '../hooks/que
 const navItems = [
   { to: '/memories', label: 'Memories' },
   { to: '/import', label: 'Import' },
-  { to: '/jobs', label: 'Jobs' },
   { to: '/settings', label: 'Settings' },
 ];
 

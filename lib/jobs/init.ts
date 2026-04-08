@@ -2,6 +2,7 @@ import { query } from '../db';
 import { getGitHubToken } from '../import/token-store';
 import { registerJobType } from './registry';
 import { registerSchedule, startSchedule } from './scheduler';
+import { recoverStaleJobs } from './runner';
 import { githubImportHandler } from './handlers/github-import';
 import { reprocessHandler } from './handlers/reprocess';
 import { githubSyncHandler } from './handlers/github-sync';
@@ -39,8 +40,8 @@ export function initJobSystem(): void {
     },
   });
 
-  // Start auto-sync if previously enabled
-  startSchedule('github-sync').catch((err) =>
-    console.warn('Auto-sync scheduler startup failed:', err),
-  );
+  // Recover any orphaned jobs from a previous server instance, then start auto-sync
+  recoverStaleJobs()
+    .then(() => startSchedule('github-sync'))
+    .catch((err) => console.warn('Job system startup failed:', err));
 }

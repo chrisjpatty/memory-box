@@ -7,7 +7,7 @@ import { MemoryView } from './pages/MemoryView';
 import { Import } from './pages/Import';
 import { ImportTwitter } from './pages/ImportTwitter';
 import { ImportIngest } from './pages/ImportIngest';
-import { Jobs } from './pages/Jobs';
+import { ImportActivity } from './pages/ImportActivity';
 import { Layout } from './components/Layout';
 import { ProtectedRoute } from './components/ProtectedRoute';
 
@@ -24,7 +24,7 @@ export default function App() {
           <Route path="import" element={<ImportIngest />} />
           <Route path="import/github" element={<Import />} />
           <Route path="import/twitter" element={<ImportTwitter />} />
-          <Route path="jobs" element={<Jobs />} />
+          <Route path="import/activity" element={<ImportActivity />} />
           <Route path="settings" element={<Dashboard />} />
         </Route>
       </Route>

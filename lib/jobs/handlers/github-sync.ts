@@ -15,12 +15,19 @@ export const githubSyncHandler: JobHandler<GitHubSyncPayload> = {
   async process(payload, ctx) {
     const { username, token } = payload;
 
-    const batch = await githubFetch(
-      `/users/${username}/starred?per_page=30&sort=created&direction=desc`,
-      token,
-    );
+    let batch: any;
+    try {
+      batch = await githubFetch(
+        `/users/${username}/starred?per_page=30&sort=created&direction=desc`,
+        token,
+      );
+    } catch (err) {
+      throw new Error(`Failed to fetch starred repos for ${username}: ${(err as Error).message}`);
+    }
 
-    if (!Array.isArray(batch)) return;
+    if (!Array.isArray(batch)) {
+      throw new Error(`GitHub API returned unexpected response for ${username}'s stars`);
+    }
 
     const publicRepos = batch.filter((repo: any) => !repo.private);
     await ctx.progress({ total: publicRepos.length });
