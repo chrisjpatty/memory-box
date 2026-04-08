@@ -85,6 +85,42 @@ export function parseGitHubUrl(url: URL): {
   return { owner, repo, type: 'other' };
 }
 
+/** Extract the first non-badge image URL from markdown content. */
+function extractReadmeImage(markdown: string): string | null {
+  const imageRegex = /!\[[^\]]*\]\(([^)]+)\)/g;
+
+  // Patterns that indicate a badge or status icon rather than a real image
+  const badgePatterns = [
+    /shields\.io/i,
+    /badgen\.net/i,
+    /badge\.fury\.io/i,
+    /codecov\.io/i,
+    /coveralls\.io/i,
+    /travis-ci\./i,
+    /circleci\.com/i,
+    /app\.codacy\.com/i,
+    /snyk\.io/i,
+    /david-dm\.org/i,
+    /img\.shields/i,
+    /badge/i,
+    /\.svg(\?|$)/i,
+    /workflow.*status/i,
+    /github\.com\/[^)]*\/actions\//i,
+    /pypi\.org/i,
+    /npmjs\.com/i,
+    /crates\.io/i,
+  ];
+
+  let match;
+  while ((match = imageRegex.exec(markdown)) !== null) {
+    const url = match[1].trim();
+    const isBadge = badgePatterns.some((p) => p.test(url));
+    if (!isBadge) return url;
+  }
+
+  return null;
+}
+
 // --- Handlers for different GitHub URL types ---
 
 async function handleRepo(owner: string, repo: string, url: URL): Promise<UrlHandlerResult> {
@@ -162,6 +198,7 @@ async function handleRepo(owner: string, repo: string, url: URL): Promise<UrlHan
       createdAt: repoData.created_at || '',
       updatedAt: repoData.updated_at || '',
       url: url.href,
+      ...(readme ? { readmeImage: extractReadmeImage(readme) || '' } : {}),
     },
   };
 }
