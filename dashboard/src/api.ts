@@ -87,6 +87,18 @@ export const api = {
   getTwitterFolders: () =>
     request<{ folders: { id: string; name: string }[] }>('/api/import/twitter/folders'),
 
+  // Conversations
+  listConversations: () =>
+    request<{ conversations: { id: string; title: string; created_at: string; updated_at: string }[] }>('/api/conversations'),
+  createConversation: (opts?: { id?: string; title?: string }) =>
+    request<{ id: string; title: string; created_at: string; updated_at: string }>('/api/conversations', { method: 'POST', body: JSON.stringify(opts) }),
+  conversationMessages: (id: string) =>
+    request<{ messages: { id: string; role: string; content: string; parts: any[] }[] }>(`/api/conversations/${id}/messages`),
+  updateConversation: (id: string, title: string) =>
+    request<{ id: string; title: string; created_at: string; updated_at: string }>(`/api/conversations/${id}`, { method: 'PATCH', body: JSON.stringify({ title }) }),
+  deleteConversation: (id: string) =>
+    request<{ success: boolean }>(`/api/conversations/${id}`, { method: 'DELETE' }),
+
   // Unified job system
   startJob: (type: string, payload?: any) =>
     request<{ jobId: string }>('/api/jobs', { method: 'POST', body: JSON.stringify({ type, payload }) }),

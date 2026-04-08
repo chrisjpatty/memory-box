@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, type KeyboardEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { Streamdown } from 'streamdown';
 import 'streamdown/styles.css';
-import { useChat, type ToolCallPart } from '../hooks/useChat';
+import type { Message, ToolCallPart } from '../hooks/useChat';
 import { MemoryCard, type MemoryCardData } from './MemoryCard';
 
 function getToolLabel(toolName: string, args: Record<string, unknown>): { action: string; past: string; detail?: string } {
@@ -240,8 +240,14 @@ function DisplayedMemories({ tools }: { tools: ToolCallPart[] }) {
   );
 }
 
-export function Thread() {
-  const { messages, isStreaming, send } = useChat();
+interface ThreadProps {
+  messages: Message[];
+  isLoading: boolean;
+  isStreaming: boolean;
+  onSend: (content: string) => void;
+}
+
+export function Thread({ messages, isLoading, isStreaming, onSend }: ThreadProps) {
   const [input, setInput] = useState('');
   const bottomRef = useRef<HTMLDivElement>(null);
   const isSticky = useRef(true);
@@ -284,7 +290,7 @@ export function Thread() {
     setInput('');
     isSticky.current = true;
     setShowScrollButton(false);
-    send(text);
+    onSend(text);
   };
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -298,12 +304,18 @@ export function Thread() {
     <div className="flex flex-col min-h-full">
       <div className="flex-1">
         {messages.length === 0 ? (
+          isLoading ? (
+            <div className="flex items-center justify-center min-h-[calc(100vh-8rem)]">
+              <Spinner />
+            </div>
+          ) : (
           <div className="flex flex-col items-center justify-center min-h-[calc(100vh-8rem)] text-center px-4">
             <h1 className="text-2xl font-bold mb-2">Memory Box</h1>
             <p className="text-neutral-500 text-sm max-w-md">
               Search your memories with natural language. Ask a question or describe what you're looking for.
             </p>
           </div>
+          )
         ) : (
           <div className="max-w-3xl mx-auto py-6 px-4 pb-20">
             {messages.map((message) => {

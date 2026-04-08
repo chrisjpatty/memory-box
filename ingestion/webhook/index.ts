@@ -12,6 +12,7 @@ import { search } from './api/search';
 import { ingestApi } from './api/ingest';
 import { importApi } from './api/import';
 import { chat } from './api/chat';
+import { conversations } from './api/conversations';
 import { jobsApi } from './api/jobs';
 import { initJobSystem } from '../../lib/jobs/init';
 import type { IngestRequest } from '../../lib/types';
@@ -43,6 +44,7 @@ app.route('/api/search', search);
 app.route('/api/ingest', ingestApi);
 app.route('/api/import', importApi);
 app.route('/api/jobs', jobsApi);
+app.route('/api/conversations', conversations);
 app.route('/api/chat', chat);
 
 // --- Ingestion routes (bearer token auth) ---

@@ -20,6 +20,7 @@
     "@mastra/memory": "latest",
     "@mastra/observability": "latest",
     "@mastra/otel-exporter": "latest",
+    "@mastra/pg": "^1.9.0",
     "@mastra/rag": "latest",
     "@opentelemetry/exporter-trace-otlp-proto": "latest",
     "ai": "latest",

@@ -18,6 +18,7 @@ export default function App() {
       <Route element={<ProtectedRoute />}>
         <Route element={<Layout />}>
           <Route index element={<Chat />} />
+          <Route path="chat/*" element={<Chat />} />
           <Route path="memories" element={<Memories />} />
           <Route path="memories/:id" element={<MemoryView />} />
           <Route path="import" element={<ImportIngest />} />

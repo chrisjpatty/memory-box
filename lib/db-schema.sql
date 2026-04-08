@@ -120,6 +120,21 @@ UPDATE jobs SET type = 'github-import' WHERE type = 'import';
 CREATE INDEX IF NOT EXISTS idx_jobs_type_status ON jobs (type, status);
 CREATE INDEX IF NOT EXISTS idx_jobs_parent ON jobs (parent_job_id) WHERE parent_job_id IS NOT NULL;
 
+-- Chat conversations
+CREATE TABLE IF NOT EXISTS conversations (
+  id          TEXT PRIMARY KEY,
+  title       TEXT NOT NULL DEFAULT 'New conversation',
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+DROP TRIGGER IF EXISTS conversations_updated_at ON conversations;
+CREATE TRIGGER conversations_updated_at
+  BEFORE UPDATE ON conversations
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+CREATE INDEX IF NOT EXISTS idx_conversations_updated ON conversations (updated_at DESC);
+
 -- Key-value settings (GitHub token, sync config)
 CREATE TABLE IF NOT EXISTS settings (
   key        TEXT PRIMARY KEY,

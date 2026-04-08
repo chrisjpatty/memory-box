@@ -39,11 +39,17 @@ const SMOOTH_FACTOR = 0.06;
 // Prevents catching up fully and pausing between chunks.
 const MIN_BUFFER_HOLD = 4;
 
-export function useChat() {
+export function useChat(threadId: string, onConversationCreated?: (id: string) => void) {
   const [messages, setMessages] = useState<Message[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
   const streamingRef = useRef(false);
   const messagesRef = useRef<Message[]>([]);
+  const threadIdRef = useRef(threadId);
+  threadIdRef.current = threadId;
+  const loadedThreadRef = useRef<string | null>(null);
+  const onConversationCreatedRef = useRef(onConversationCreated);
+  onConversationCreatedRef.current = onConversationCreated;
 
   const completedPartsRef = useRef<MessagePart[]>([]);
   const activeTextTargetRef = useRef('');
@@ -54,6 +60,28 @@ export function useChat() {
   const rafRef = useRef<number>(0);
 
   messagesRef.current = messages;
+
+  // Load existing messages when visiting a conversation, or clear when starting fresh
+  useEffect(() => {
+    if (loadedThreadRef.current === threadId) return;
+    loadedThreadRef.current = threadId;
+
+    if (!threadId) {
+      setMessages([]);
+      return;
+    }
+
+    setIsLoading(true);
+    fetch(`/api/conversations/${threadId}/messages`, { credentials: 'include' })
+      .then((res) => res.ok ? res.json() : { messages: [] })
+      .then((data) => {
+        if (data.messages?.length > 0) {
+          setMessages(data.messages);
+        }
+      })
+      .catch(() => {})
+      .finally(() => setIsLoading(false));
+  }, [threadId]);
 
   function buildParts(): MessagePart[] {
     const parts = [...completedPartsRef.current];
@@ -141,11 +169,6 @@ export function useChat() {
       parts: [],
     };
 
-    const apiMessages = [...messagesRef.current, userMessage].map((m) => ({
-      role: m.role,
-      content: m.content,
-    }));
-
     setMessages((prev) => [...prev, userMessage, assistantMessage]);
 
     try {
@@ -153,7 +176,10 @@ export function useChat() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ messages: apiMessages }),
+        body: JSON.stringify({
+          messages: [{ role: 'user', content }],
+          ...(threadIdRef.current ? { memory: { thread: threadIdRef.current, resource: 'user' } } : {}),
+        }),
       });
 
       if (!response.ok || !response.body) {
@@ -182,6 +208,12 @@ export function useChat() {
               const parsed = JSON.parse(data);
 
               switch (parsed.type) {
+                case 'conversation-created':
+                  threadIdRef.current = parsed.conversationId;
+                  loadedThreadRef.current = parsed.conversationId;
+                  onConversationCreatedRef.current?.(parsed.conversationId);
+                  break;
+
                 case 'text-start':
                   activeTextTargetRef.current = '';
                   smoothPosRef.current = 0;
@@ -256,5 +288,5 @@ export function useChat() {
     }
   }, []);
 
-  return { messages, isStreaming, send };
+  return { messages, isLoading, isStreaming, send } as const;
 }

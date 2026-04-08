@@ -4,6 +4,7 @@ import { api } from '../api';
 // --- Query Keys ---
 
 export const queryKeys = {
+  conversations: ['conversations'] as const,
   authStatus: ['auth', 'status'] as const,
   tokens: ['tokens'] as const,
   stats: ['stats'] as const,
@@ -20,6 +21,45 @@ export const queryKeys = {
   activeJobs: ['jobs', 'active'] as const,
   jobHistory: ['jobs', 'history'] as const,
 };
+
+// --- Conversations ---
+
+export function useConversations() {
+  return useQuery({
+    queryKey: queryKeys.conversations,
+    queryFn: () => api.listConversations(),
+  });
+}
+
+export function useCreateConversation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (opts?: { id?: string; title?: string }) => api.createConversation(opts),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.conversations });
+    },
+  });
+}
+
+export function useUpdateConversation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, title }: { id: string; title: string }) => api.updateConversation(id, title),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.conversations });
+    },
+  });
+}
+
+export function useDeleteConversation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.deleteConversation(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.conversations });
+    },
+  });
+}
 
 // --- Auth ---
 

@@ -28,6 +28,7 @@ import { search } from '../ingestion/webhook/api/search';
 import { ingestApi } from '../ingestion/webhook/api/ingest';
 import { importApi } from '../ingestion/webhook/api/import';
 import { chat } from '../ingestion/webhook/api/chat';
+import { conversations } from '../ingestion/webhook/api/conversations';
 import { jobsApi } from '../ingestion/webhook/api/jobs';
 import { initDatabase } from '../lib/db-init';
 import { initJobSystem } from '../lib/jobs/init';
@@ -159,6 +160,7 @@ app.route('/api/search', search);
 app.route('/api/ingest', ingestApi);
 app.route('/api/import', importApi);
 app.route('/api/jobs', jobsApi);
+app.route('/api/conversations', conversations);
 app.route('/api/chat', chat);
 
 // Initialize database and job system

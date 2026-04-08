@@ -18,7 +18,7 @@
 import { Agent } from '@mastra/core/agent';
 import { Mastra } from '@mastra/core/mastra';
 import { Memory } from '@mastra/memory';
-import { LibSQLStore } from '@mastra/libsql';
+import { PostgresStore } from '@mastra/pg';
 import { Observability } from '@mastra/observability';
 import { OtelExporter } from '@mastra/otel-exporter';
 import { serve } from '@astropods/adapter-mastra';
@@ -31,10 +31,18 @@ import { deleteMemory } from '../tools/delete-memory';
 import { graphQuery } from '../tools/graph-query';
 import { displayMemories } from '../tools/display-memories';
 
+const host = process.env.POSTGRES_HOST || process.env.DB_HOST || '127.0.0.1';
+const port = parseInt(process.env.DB_PORT || process.env.POSTGRES_PORT || '5432');
+const database = process.env.POSTGRES_DB || 'memory_box';
+const user = process.env.POSTGRES_USER || 'postgres';
+const password = process.env.POSTGRES_PASSWORD || 'postgres';
+const connectionString = process.env.DATABASE_URL || process.env.DB_URL ||
+  `postgresql://${user}:${password}@${host}:${port}/${database}`;
+
 const memory = new Memory({
-  storage: new LibSQLStore({
+  storage: new PostgresStore({
     id: 'memory',
-    url: ':memory:',
+    connectionString,
   }),
 });
 
