@@ -65,7 +65,7 @@ export const listMemories = createTool({
       contentType: r.content_type,
       category: r.category || '',
       summary: r.summary || '',
-      createdAt: r.created_at,
+      createdAt: r.created_at instanceof Date ? r.created_at.toISOString() : r.created_at || '',
     }));
 
     // Count total (reuse conditions but without LIMIT/OFFSET params)

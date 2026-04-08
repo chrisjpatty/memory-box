@@ -30,21 +30,22 @@ async function vectorSearch(queryText: string, limit: number): Promise<SearchHit
   const queryEmbedding = await getEmbeddingProvider().embedOne(queryText);
 
   const result = await query(
-    `SELECT DISTINCT ON (mc.memory_id)
-       mc.memory_id, mc.text AS snippet,
-       1 - (mc.embedding <=> $1::vector) AS score,
-       m.title, m.content_type, m.summary, m.tags, m.category,
-       m.created_at, m.source_url, m.metadata, m.file_key
-     FROM memory_chunks mc
-     JOIN memories m ON m.id = mc.memory_id
-     ORDER BY mc.memory_id, mc.embedding <=> $1::vector
+    `SELECT * FROM (
+       SELECT DISTINCT ON (mc.memory_id)
+         mc.memory_id, mc.text AS snippet,
+         1 - (mc.embedding <=> $1::vector) AS score,
+         m.title, m.content_type, m.summary, m.tags, m.category,
+         m.created_at, m.source_url, m.metadata, m.file_key
+       FROM memory_chunks mc
+       JOIN memories m ON m.id = mc.memory_id
+       ORDER BY mc.memory_id, mc.embedding <=> $1::vector
+     ) sub
+     ORDER BY score DESC
      LIMIT $2`,
     [pgvector.toSql(queryEmbedding), limit * 3],
   );
 
-  // Re-sort by score after DISTINCT ON
   return result.rows
-    .sort((a: any, b: any) => b.score - a.score)
     .slice(0, limit)
     .map((r: any) => ({
       memoryId: r.memory_id,
