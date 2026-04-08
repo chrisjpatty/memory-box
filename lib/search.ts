@@ -56,7 +56,7 @@ async function vectorSearch(queryText: string, limit: number): Promise<SearchHit
       tags: r.tags || [],
       category: r.category || '',
       createdAt: r.created_at?.toISOString?.() || r.created_at || '',
-      source: r.source_url,
+      source: r.source_url || undefined,
       hasImage: r.file_key != null && !r.file_key.endsWith('/original.html'),
       extra: r.metadata || {},
     }));
@@ -89,7 +89,7 @@ async function keywordSearch(queryText: string, limit: number): Promise<SearchHi
       tags: r.tags || [],
       category: r.category || '',
       createdAt: r.created_at?.toISOString?.() || r.created_at || '',
-      source: r.source_url,
+      source: r.source_url || undefined,
       hasImage: r.file_key != null && !r.file_key.endsWith('/original.html'),
       extra: r.metadata || {},
     }));
