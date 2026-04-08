@@ -108,4 +108,3 @@ Configured in `astropods.yml`. Key settings:
 
 Secrets set via `ast configure`:
 - `ANTHROPIC_API_KEY` — Claude API key
-- `ENCRYPTION_KEY` — Secret key for encrypting stored third-party tokens

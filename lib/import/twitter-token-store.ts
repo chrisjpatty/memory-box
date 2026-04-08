@@ -1,5 +1,6 @@
 import { createCipheriv, createDecipheriv, createHash, randomBytes, scryptSync } from 'crypto';
 import { query } from '../db';
+import { getOrCreateEncryptionKey } from '../auth';
 import { twitterFetch } from '../pipeline/url-handlers/twitter';
 
 const ALGORITHM = 'aes-256-gcm';
@@ -7,14 +8,13 @@ const SCOPES = 'bookmark.read tweet.read users.read offline.access';
 
 // --- Encryption (same pattern as GitHub token store, different salt) ---
 
-function getEncryptionKey(): Buffer {
-  const secret = process.env.ENCRYPTION_KEY;
-  if (!secret) throw new Error('ENCRYPTION_KEY is required for token encryption');
+async function getEncryptionKeyBuffer(): Promise<Buffer> {
+  const secret = await getOrCreateEncryptionKey();
   return scryptSync(secret, 'memory-box-twitter-token', 32);
 }
 
-function encrypt(plaintext: string): string {
-  const key = getEncryptionKey();
+async function encrypt(plaintext: string): Promise<string> {
+  const key = await getEncryptionKeyBuffer();
   const iv = randomBytes(16);
   const cipher = createCipheriv(ALGORITHM, key, iv);
   const encrypted = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()]);
@@ -22,8 +22,8 @@ function encrypt(plaintext: string): string {
   return `${iv.toString('hex')}:${authTag.toString('hex')}:${encrypted.toString('hex')}`;
 }
 
-function decrypt(stored: string): string {
-  const key = getEncryptionKey();
+async function decrypt(stored: string): Promise<string> {
+  const key = await getEncryptionKeyBuffer();
   const [ivHex, authTagHex, encryptedHex] = stored.split(':');
   const iv = Buffer.from(ivHex, 'hex');
   const authTag = Buffer.from(authTagHex, 'hex');
@@ -58,8 +58,8 @@ export async function saveTwitterCredentials(
   clientId: string,
   clientSecret: string,
 ): Promise<void> {
-  await saveSetting('twitter_client_id', encrypt(clientId));
-  await saveSetting('twitter_client_secret', encrypt(clientSecret));
+  await saveSetting('twitter_client_id', await encrypt(clientId));
+  await saveSetting('twitter_client_secret', await encrypt(clientSecret));
 }
 
 export async function getTwitterCredentials(): Promise<{
@@ -70,7 +70,7 @@ export async function getTwitterCredentials(): Promise<{
   const encClientSecret = await getSetting('twitter_client_secret');
   if (!encClientId || !encClientSecret) return null;
   try {
-    return { clientId: decrypt(encClientId), clientSecret: decrypt(encClientSecret) };
+    return { clientId: await decrypt(encClientId), clientSecret: await decrypt(encClientSecret) };
   } catch {
     return null;
   }
@@ -142,9 +142,9 @@ export async function handleOAuthCallback(
   );
 
   // Store tokens
-  await saveSetting('twitter_access_token', encrypt(tokenResponse.access_token));
+  await saveSetting('twitter_access_token', await encrypt(tokenResponse.access_token));
   if (tokenResponse.refresh_token) {
-    await saveSetting('twitter_refresh_token', encrypt(tokenResponse.refresh_token));
+    await saveSetting('twitter_refresh_token', await encrypt(tokenResponse.refresh_token));
   }
   const expiresAt = new Date(
     Date.now() + tokenResponse.expires_in * 1000,
@@ -176,7 +176,7 @@ export async function getTwitterToken(): Promise<string | null> {
 
   let accessToken: string;
   try {
-    accessToken = decrypt(encToken);
+    accessToken = await decrypt(encToken);
   } catch {
     return null;
   }
@@ -206,7 +206,7 @@ async function tryRefreshToken(): Promise<string | null> {
 
   let refreshToken: string;
   try {
-    refreshToken = decrypt(encRefresh);
+    refreshToken = await decrypt(encRefresh);
   } catch {
     return null;
   }
@@ -218,11 +218,11 @@ async function tryRefreshToken(): Promise<string | null> {
       creds.clientSecret,
     );
 
-    await saveSetting('twitter_access_token', encrypt(tokenResponse.access_token));
+    await saveSetting('twitter_access_token', await encrypt(tokenResponse.access_token));
     if (tokenResponse.refresh_token) {
       await saveSetting(
         'twitter_refresh_token',
-        encrypt(tokenResponse.refresh_token),
+        await encrypt(tokenResponse.refresh_token),
       );
     }
     const expiresAt = new Date(

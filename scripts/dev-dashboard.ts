@@ -53,8 +53,6 @@ try {
 process.env.POSTGRES_DB ??= 'memory_box';
 process.env.POSTGRES_USER ??= 'postgres';
 process.env.POSTGRES_PASSWORD ??= 'postgres';
-process.env.ENCRYPTION_KEY ??= 'dev-encryption-key';
-
 // MinIO defaults
 process.env.MINIO_HOST = 'localhost';
 process.env.MINIO_PORT = '9000';

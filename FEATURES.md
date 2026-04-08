@@ -242,7 +242,7 @@ The core pipeline. Accepts content, detects its type, deduplicates, classifies v
 ### 10.3 Deployment
 - Astropods platform with Docker containers
 - Config: `astropods.yml`
-- Secrets: ENCRYPTION_KEY, ANTHROPIC_API_KEY, MINIO_ROOT_PASSWORD
+- Secrets: ANTHROPIC_API_KEY
 
 ### 10.4 Observability
 - OpenTelemetry tracing via @mastra/observability

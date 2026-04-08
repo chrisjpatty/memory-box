@@ -2,7 +2,7 @@
  * Authentication: bearer tokens, password hashing, and timing-safe comparison.
  * Backed by PostgreSQL auth_tokens + settings tables.
  */
-import { createHash, timingSafeEqual } from 'crypto';
+import { createHash, randomBytes, timingSafeEqual } from 'crypto';
 import { nanoid } from 'nanoid';
 import { query } from './db';
 
@@ -17,6 +17,29 @@ export function safeCompare(a: string, b: string): boolean {
   const bufA = createHash('sha256').update(a).digest();
   const bufB = createHash('sha256').update(b).digest();
   return timingSafeEqual(bufA, bufB);
+}
+
+// --- Encryption key (auto-generated, stored in MinIO separate from DB) ---
+
+const ENCRYPTION_KEY_PATH = '_system/encryption.key';
+
+let cachedEncryptionKey: string | null = null;
+
+export async function getOrCreateEncryptionKey(): Promise<string> {
+  if (cachedEncryptionKey) return cachedEncryptionKey;
+
+  const { getFile, putFile } = await import('./storage');
+
+  const existing = await getFile(ENCRYPTION_KEY_PATH);
+  if (existing) {
+    cachedEncryptionKey = existing.data.toString('utf8');
+    return cachedEncryptionKey!;
+  }
+
+  const key = randomBytes(32).toString('hex');
+  await putFile(ENCRYPTION_KEY_PATH, Buffer.from(key, 'utf8'), 'application/octet-stream');
+  cachedEncryptionKey = key;
+  return key;
 }
 
 // --- Admin password (bcrypt, stored in settings table) ---

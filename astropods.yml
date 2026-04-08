@@ -6,20 +6,6 @@ agent:
   build:
     context: .
     dockerfile: Dockerfile
-  inputs:
-    - name: ENCRYPTION_KEY
-      datatype: string
-      secret: true
-      description: Secret key used to encrypt stored third-party tokens (GitHub, Twitter)
-    - name: MINIO_ROOT_USER
-      datatype: string
-      description: MinIO root username for file storage
-      default: minioadmin
-    - name: MINIO_ROOT_PASSWORD
-      datatype: string
-      secret: true
-      description: MinIO root password for file storage
-
 models:
   ollama:
     provider: ollama

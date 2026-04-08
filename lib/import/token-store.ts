@@ -1,17 +1,17 @@
 import { createCipheriv, createDecipheriv, randomBytes, scryptSync } from 'crypto';
 import { query } from '../db';
+import { getOrCreateEncryptionKey } from '../auth';
 import { githubFetch } from '../pipeline/url-handlers/github';
 
 const ALGORITHM = 'aes-256-gcm';
 
-function getEncryptionKey(): Buffer {
-  const secret = process.env.ENCRYPTION_KEY;
-  if (!secret) throw new Error('ENCRYPTION_KEY is required for token encryption');
+async function getEncryptionKeyBuffer(): Promise<Buffer> {
+  const secret = await getOrCreateEncryptionKey();
   return scryptSync(secret, 'memory-box-github-token', 32);
 }
 
-function encrypt(plaintext: string): string {
-  const key = getEncryptionKey();
+async function encrypt(plaintext: string): Promise<string> {
+  const key = await getEncryptionKeyBuffer();
   const iv = randomBytes(16);
   const cipher = createCipheriv(ALGORITHM, key, iv);
   const encrypted = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()]);
@@ -20,8 +20,8 @@ function encrypt(plaintext: string): string {
   return `${iv.toString('hex')}:${authTag.toString('hex')}:${encrypted.toString('hex')}`;
 }
 
-function decrypt(stored: string): string {
-  const key = getEncryptionKey();
+async function decrypt(stored: string): Promise<string> {
+  const key = await getEncryptionKeyBuffer();
   const [ivHex, authTagHex, encryptedHex] = stored.split(':');
   const iv = Buffer.from(ivHex, 'hex');
   const authTag = Buffer.from(authTagHex, 'hex');
@@ -33,7 +33,7 @@ function decrypt(stored: string): string {
 
 export async function saveGitHubToken(token: string): Promise<{ username: string; hint: string }> {
   const username = await getGitHubUsername(token);
-  const encryptedToken = encrypt(token);
+  const encryptedToken = await encrypt(token);
 
   await query(
     `INSERT INTO settings (key, value) VALUES ('github_token', $1)
@@ -53,7 +53,7 @@ export async function getGitHubToken(): Promise<string | null> {
   const result = await query(`SELECT value FROM settings WHERE key = 'github_token'`);
   if (result.rows.length === 0) return null;
   try {
-    return decrypt(result.rows[0].value);
+    return await decrypt(result.rows[0].value);
   } catch {
     return null;
   }
