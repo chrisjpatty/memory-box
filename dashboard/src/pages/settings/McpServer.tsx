@@ -4,20 +4,14 @@ import Prism from 'prismjs';
 import 'prismjs/components/prism-json';
 import 'prismjs/themes/prism-tomorrow.css';
 
-type ConfigTab = 'claude-web' | 'claude-desktop' | 'vscode' | 'generic';
+type ConfigTab = 'claude-desktop' | 'claude-api' | 'vscode' | 'generic';
 
 function McpConfigSnippets({ token, mcpUrl }: { token: string; mcpUrl: string }) {
-  const [tab, setTab] = useState<ConfigTab>('claude-web');
+  const [tab, setTab] = useState<ConfigTab>('claude-desktop');
   const codeRef = useRef<HTMLElement>(null);
   const [copied, setCopied] = useState(false);
 
   const snippets: Record<ConfigTab, { label: string; code: string; lang: string; note?: string }> = {
-    'claude-web': {
-      label: 'Claude.ai',
-      lang: 'json',
-      note: 'Go to Settings \u2192 Connectors \u2192 Add custom connector, then paste the URL below.',
-      code: mcpUrl,
-    },
     'claude-desktop': {
       label: 'Claude Desktop',
       lang: 'json',
@@ -34,6 +28,23 @@ function McpConfigSnippets({ token, mcpUrl }: { token: string; mcpUrl: string })
             ],
           },
         },
+      }, null, 2),
+    },
+    'claude-api': {
+      label: 'Claude API',
+      lang: 'json',
+      note: 'Add to your Messages API request. Requires beta header: anthropic-beta: mcp-client-2025-11-20',
+      code: JSON.stringify({
+        mcp_servers: [{
+          type: 'url',
+          url: mcpUrl,
+          name: 'memory-box',
+          authorization_token: token,
+        }],
+        tools: [{
+          type: 'mcp_toolset',
+          mcp_server_name: 'memory-box',
+        }],
       }, null, 2),
     },
     vscode: {
@@ -74,7 +85,7 @@ function McpConfigSnippets({ token, mcpUrl }: { token: string; mcpUrl: string })
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const tabKeys: ConfigTab[] = ['claude-web', 'claude-desktop', 'vscode', 'generic'];
+  const tabKeys: ConfigTab[] = ['claude-desktop', 'claude-api', 'vscode', 'generic'];
 
   return (
     <div className="rounded-lg border border-neutral-800 overflow-hidden">
