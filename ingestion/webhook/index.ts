@@ -69,6 +69,9 @@ app.post('/ingest', bearerAuth, async (c) => {
   }
   try {
     const result = await ingest(body);
+    if (Array.isArray(result)) {
+      return c.json({ success: true, results: result }, 201);
+    }
     return c.json({ success: true, ...result }, 201);
   } catch (err: any) {
     console.error('Ingestion error:', err);
@@ -100,6 +103,9 @@ app.post('/ingest/upload', bearerAuth, async (c) => {
       fileName: file.name,
       fileMimeType: file.type,
     });
+    if (Array.isArray(result)) {
+      return c.json({ success: true, results: result }, 201);
+    }
     return c.json({ success: true, ...result }, 201);
   } catch (err: any) {
     console.error('File upload ingestion error:', err);

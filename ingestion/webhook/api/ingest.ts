@@ -30,6 +30,9 @@ ingestApi.post('/', async (c) => {
         fileName: file.name,
         fileMimeType: file.type,
       });
+      if (Array.isArray(result)) {
+        return c.json({ success: true, results: result }, 201);
+      }
       return c.json({ success: true, ...result }, 201);
     } catch (err: any) {
       console.error('File upload ingestion error:', err);
@@ -50,6 +53,9 @@ ingestApi.post('/', async (c) => {
 
   try {
     const result = await runIngest({ content, title, tags });
+    if (Array.isArray(result)) {
+      return c.json({ success: true, results: result }, 201);
+    }
     return c.json({ success: true, ...result }, 201);
   } catch (err: any) {
     console.error('Ingestion error:', err);

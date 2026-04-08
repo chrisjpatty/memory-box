@@ -19,6 +19,16 @@ export const storeMemory = createTool({
   }),
   execute: async ({ content, title, tags }) => {
     const result = await ingest({ content, title, tags });
+    if (Array.isArray(result)) {
+      const titles = result.map(r => r.title).join(', ');
+      return {
+        memoryId: result[0]?.memoryId || '',
+        contentType: 'multiple',
+        title: titles,
+        chunks: result.reduce((sum, r) => sum + r.chunks, 0),
+        message: `Stored ${result.length} items: ${titles}`,
+      };
+    }
     return {
       ...result,
       message: `Stored "${result.title}" as ${result.contentType} memory (${result.chunks} chunks).`,

@@ -29,6 +29,11 @@ export interface ClassificationResult {
   metadata: Record<string, string>;
 }
 
+/** Return type from classifyContent — either a single classification or a split into multiple items. */
+export type ClassifyOutput =
+  | { mode: 'single'; classification: ClassificationResult }
+  | { mode: 'multiple'; items: { content: string }[] };
+
 export interface IngestRequest {
   content: string;
   contentType?: string;
@@ -38,6 +43,8 @@ export interface IngestRequest {
   fileBuffer?: Buffer;
   fileName?: string;
   fileMimeType?: string;
+  /** Internal: set when this request came from a multi-item split to prevent recursive splitting */
+  _fromSplit?: boolean;
 }
 
 export interface IngestResult {

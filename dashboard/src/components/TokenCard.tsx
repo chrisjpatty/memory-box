@@ -1,5 +1,101 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useTokens, useCreateToken, useRevokeToken } from '../hooks/queries';
+import Prism from 'prismjs';
+import 'prismjs/components/prism-bash';
+import 'prismjs/components/prism-python';
+import 'prismjs/themes/prism-tomorrow.css';
+
+type SnippetLang = 'curl' | 'javascript' | 'python';
+
+function QuickStart({ token }: { token: string }) {
+  const [tab, setTab] = useState<SnippetLang>('curl');
+  const codeRef = useRef<HTMLElement>(null);
+  const [copied, setCopied] = useState(false);
+
+  const baseUrl = window.location.origin;
+  const url = `${baseUrl}/ingest`;
+
+  const snippets: Record<SnippetLang, { code: string; prismLang: string }> = {
+    curl: {
+      prismLang: 'bash',
+      code: `curl -X POST ${url} \\
+  -H "Authorization: Bearer ${token}" \\
+  -H "Content-Type: application/json" \\
+  -d '{"content": "https://example.com/article", "tags": ["reading-list"]}'`,
+    },
+    javascript: {
+      prismLang: 'javascript',
+      code: `fetch("${url}", {
+  method: "POST",
+  headers: {
+    "Authorization": "Bearer ${token}",
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({
+    content: "https://example.com/article",
+    tags: ["reading-list"],
+  }),
+});`,
+    },
+    python: {
+      prismLang: 'python',
+      code: `import requests
+
+requests.post(
+    "${url}",
+    headers={"Authorization": "Bearer ${token}"},
+    json={"content": "https://example.com/article", "tags": ["reading-list"]},
+)`,
+    },
+  };
+
+  const active = snippets[tab];
+
+  useEffect(() => {
+    if (codeRef.current) Prism.highlightElement(codeRef.current);
+  }, [tab, token]);
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(active.code);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <div className="mt-4 rounded-lg border border-neutral-800 overflow-hidden">
+      <div className="flex items-center justify-between bg-neutral-900/80 border-b border-neutral-800 px-1">
+        <div className="flex">
+          {(['curl', 'javascript', 'python'] as SnippetLang[]).map((lang) => (
+            <button
+              key={lang}
+              onClick={() => setTab(lang)}
+              className={`px-3 py-2 text-xs font-medium transition-colors ${
+                tab === lang
+                  ? 'text-neutral-200 border-b-2 border-neutral-200'
+                  : 'text-neutral-500 hover:text-neutral-300'
+              }`}
+            >
+              {lang === 'curl' ? 'curl' : lang === 'javascript' ? 'JavaScript' : 'Python'}
+            </button>
+          ))}
+        </div>
+        <button
+          onClick={handleCopy}
+          className={`mr-2 px-2.5 py-1 rounded text-xs border transition-colors ${
+            copied ? 'border-green-600 text-green-400' : 'border-neutral-700 text-neutral-500 hover:text-neutral-300'
+          }`}
+        >
+          {copied ? 'Copied!' : 'Copy'}
+        </button>
+      </div>
+      <pre className="!m-0 !rounded-none !bg-neutral-950 p-4 overflow-x-auto">
+        <code ref={codeRef} className={`language-${active.prismLang} !text-[13px] !leading-relaxed`}>
+          {active.code}
+        </code>
+      </pre>
+    </div>
+  );
+}
 
 export function TokenCard() {
   const { data, isLoading } = useTokens();
@@ -48,28 +144,12 @@ export function TokenCard() {
   };
 
   return (
-    <div className="bg-neutral-900 border border-neutral-800 rounded-xl p-6">
-      <h2 className="text-xs font-semibold uppercase tracking-wider text-neutral-500 mb-4">API Tokens</h2>
-
+    <div>
       {message && (
         <div className={`mb-4 px-4 py-3 rounded-lg text-sm ${
           message.type === 'success' ? 'bg-green-950 border border-green-800 text-green-400' : 'bg-red-950 border border-red-800 text-red-400'
         }`}>
           {message.text}
-        </div>
-      )}
-
-      {revealedToken && (
-        <div className="mb-4 flex items-center gap-3 bg-neutral-950 border border-green-800 rounded-lg px-4 py-3 font-mono text-sm">
-          <span className="flex-1 break-all text-green-400">{revealedToken}</span>
-          <button
-            onClick={handleCopy}
-            className={`shrink-0 px-3 py-1 rounded text-xs border transition-colors ${
-              copied ? 'border-green-600 text-green-400' : 'border-neutral-700 text-neutral-400 hover:text-neutral-200'
-            }`}
-          >
-            {copied ? 'Copied!' : 'Copy'}
-          </button>
         </div>
       )}
 
@@ -88,9 +168,27 @@ export function TokenCard() {
           disabled={!name.trim() || createToken.isPending}
           className="px-4 py-2 bg-white text-black rounded-lg text-sm font-medium hover:bg-neutral-200 disabled:opacity-50 transition-colors"
         >
-          Create Token
+          Create
         </button>
       </div>
+
+      {/* Revealed token + quick start */}
+      {revealedToken && (
+        <div className="mb-4">
+          <div className="flex items-center gap-3 bg-neutral-950 border border-green-800 rounded-lg px-4 py-3 font-mono text-sm">
+            <span className="flex-1 break-all text-green-400">{revealedToken}</span>
+            <button
+              onClick={handleCopy}
+              className={`shrink-0 px-3 py-1 rounded text-xs border transition-colors ${
+                copied ? 'border-green-600 text-green-400' : 'border-neutral-700 text-neutral-400 hover:text-neutral-200'
+              }`}
+            >
+              {copied ? 'Copied!' : 'Copy'}
+            </button>
+          </div>
+          <QuickStart token={revealedToken} />
+        </div>
+      )}
 
       {/* Token list */}
       {isLoading ? (

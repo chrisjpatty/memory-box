@@ -37,7 +37,8 @@ export const githubImportHandler: JobHandler<GitHubImportPayload> = {
         await ctx.progress({ currentItem: repoUrl });
 
         try {
-          const result = await ingest({ content: repoUrl });
+          const raw = await ingest({ content: repoUrl });
+          const result = Array.isArray(raw) ? raw[0] : raw;
 
           const entry = result.deduplicated
             ? { repo: repoUrl, status: 'skipped' as const, memoryId: result.existingMemoryId }

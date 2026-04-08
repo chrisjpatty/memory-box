@@ -3,6 +3,10 @@
  *
  * Pipeline: detect → dedup check → extract → classify → chunk → embed → store
  *
+ * The classifier may return "multiple" mode for content that should be split
+ * into discrete items (e.g. a list of URLs). Each item is then ingested
+ * independently through the full pipeline.
+ *
  * Re-exports detection/hashing functions for backwards compatibility with tests.
  */
 import { detectContentType, detectFromBuffer, contentHash, bufferHash, classifyImage, classifyPdf } from './pipeline/detect';
@@ -27,8 +31,11 @@ export { splitOversizedChunks } from './pipeline/embed';
  *
  * Supports: text, URLs, images (base64), PDFs (base64 or buffer), file uploads (buffer).
  * Deduplicates by content hash and URL before ingesting.
+ *
+ * Returns a single IngestResult for single items, or an array when the classifier
+ * splits the content into multiple discrete items.
  */
-export async function ingest(request: IngestRequest): Promise<IngestResult> {
+export async function ingest(request: IngestRequest): Promise<IngestResult | IngestResult[]> {
   const { content, title, tags, fileBuffer, fileName, fileMimeType } = request;
 
   // --- File buffer path (multipart uploads) ---
@@ -65,12 +72,15 @@ export async function ingest(request: IngestRequest): Promise<IngestResult> {
       });
     }
 
-    // Generic file: extract text content
+    // Generic file: classify then ingest (files are always single items)
     const textContent = fileBuffer.toString('utf-8');
-    const classification = await classifyContent(textContent, title, tags);
+    const classifyResult = await classifyContent(textContent, title, tags);
+    const classification = classifyResult.mode === 'single'
+      ? classifyResult.classification
+      : { contentType: 'file' as const, title: title || fileName || 'File', tags: tags || [], category: 'document', summary: textContent.slice(0, 200), metadata: {} };
     classification.contentType = 'file';
     return ingestContent({
-      content: textContent,
+      content: fileBuffer.toString('utf-8'),
       hash,
       initialClassification: classification,
       userTitle: title,
@@ -142,9 +152,13 @@ export async function ingest(request: IngestRequest): Promise<IngestResult> {
     }
   }
 
-  // URLs: classify first, then extract
+  // URLs (single, already detected): classify and extract
   if (detectedType === 'url') {
-    const classification = await classifyContent(content, title, tags);
+    const classifyResult = await classifyContent(content, title, tags);
+    // A single detected URL won't split, but handle gracefully
+    const classification = classifyResult.mode === 'single'
+      ? classifyResult.classification
+      : { contentType: 'url' as const, title: title || content.trim(), tags: tags || [], category: 'bookmark', summary: '', metadata: {} };
     classification.contentType = 'url';
     return ingestContent({
       content,
@@ -157,8 +171,25 @@ export async function ingest(request: IngestRequest): Promise<IngestResult> {
     });
   }
 
-  // Text: classify and ingest directly
-  const classification = await classifyContent(content, title, tags);
+  // --- Text content: classify (may split into multiple items) ---
+  const classifyResult = await classifyContent(content, title, tags);
+
+  if (classifyResult.mode === 'multiple' && !request._fromSplit) {
+    // Classifier identified discrete items — ingest each independently
+    const results = await Promise.allSettled(
+      classifyResult.items.map(item =>
+        ingest({ content: item.content, tags, _fromSplit: true }),
+      ),
+    );
+    return results
+      .filter((r): r is PromiseFulfilledResult<IngestResult> => r.status === 'fulfilled')
+      .map(r => r.value as IngestResult);
+  }
+
+  // Single mode (or _fromSplit): ingest as one item with source text preserved
+  const classification = classifyResult.mode === 'single'
+    ? classifyResult.classification
+    : { contentType: 'text' as const, title: title || content.slice(0, 80), tags: tags || [], category: 'note', summary: content.slice(0, 200), metadata: {} };
   return ingestContent({
     content,
     hash,
@@ -219,11 +250,14 @@ async function ingestContent(args: IngestContentArgs): Promise<IngestResult> {
     // Re-classify if extraction suggests it (e.g., PDF after text extraction)
     if (extracted.reclassify) {
       const reclassified = await classifyContent(text.slice(0, 10000), userTitle, userTags);
-      reclassified.contentType = classification.contentType;
-      reclassified.tags = [...new Set([...reclassified.tags, ...classification.tags])];
-      reclassified.metadata = { ...classification.metadata, ...reclassified.metadata };
-      if (userTitle) reclassified.title = userTitle;
-      classification = reclassified;
+      const reclassification = reclassified.mode === 'single'
+        ? reclassified.classification
+        : { contentType: classification.contentType, title: classification.title, tags: classification.tags, category: classification.category, summary: classification.summary, metadata: classification.metadata };
+      reclassification.contentType = classification.contentType;
+      reclassification.tags = [...new Set([...reclassification.tags, ...classification.tags])];
+      reclassification.metadata = { ...classification.metadata, ...reclassification.metadata };
+      if (userTitle) reclassification.title = userTitle;
+      classification = reclassification;
     }
   }
 

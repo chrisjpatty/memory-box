@@ -34,12 +34,15 @@ mock.module('../../../../lib/pipeline/embed', () => ({
 
 mock.module('../../../../lib/pipeline/classify', () => ({
   classifyContent: async (content: string, title?: string, tags?: string[]) => ({
-    contentType: 'text',
-    title: title || 'Test Title',
-    tags: tags || ['test'],
-    category: 'note',
-    summary: content.slice(0, 100),
-    metadata: {},
+    mode: 'single' as const,
+    classification: {
+      contentType: 'text',
+      title: title || 'Test Title',
+      tags: tags || ['test'],
+      category: 'note',
+      summary: content.slice(0, 100),
+      metadata: {},
+    },
   }),
   fallbackClassify: (content: string, userTitle?: string, userTags?: string[]) => ({
     contentType: 'text',
@@ -83,6 +86,9 @@ app.post('/ingest', bearerAuth, async (c) => {
   }
   try {
     const result = await ingest(body);
+    if (Array.isArray(result)) {
+      return c.json({ success: true, results: result }, 201);
+    }
     return c.json({ success: true, ...result }, 201);
   } catch (err: any) {
     return c.json({ error: `Ingestion failed: ${err.message}` }, 500);

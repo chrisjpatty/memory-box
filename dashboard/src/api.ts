@@ -37,6 +37,7 @@ export const api = {
   },
   memory: (id: string) => request<{ found: boolean; memory?: any }>(`/api/memories/${id}`),
   deleteMemory: (id: string) => request<{ success: boolean; message: string }>(`/api/memories/${id}`, { method: 'DELETE' }),
+  clearAllMemories: () => request<{ success: boolean }>('/api/memories', { method: 'DELETE' }),
 
   search: (query: string, limit?: number) => request<{ results: any[] }>('/api/search', { method: 'POST', body: JSON.stringify({ query, limit }) }),
 

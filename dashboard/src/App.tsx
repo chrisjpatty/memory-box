@@ -1,7 +1,6 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { Login } from './pages/Login';
 import { Chat } from './pages/Chat';
-import { Dashboard } from './pages/Dashboard';
 import { Memories } from './pages/Memories';
 import { MemoryView } from './pages/MemoryView';
 import { Import } from './pages/Import';
@@ -10,6 +9,10 @@ import { ImportIngest } from './pages/ImportIngest';
 import { ImportActivity } from './pages/ImportActivity';
 import { Layout } from './components/Layout';
 import { ProtectedRoute } from './components/ProtectedRoute';
+import { SettingsLayout } from './pages/settings/SettingsLayout';
+import { General } from './pages/settings/General';
+import { Tokens } from './pages/settings/Tokens';
+import { DangerZone } from './pages/settings/DangerZone';
 
 export default function App() {
   return (
@@ -25,7 +28,11 @@ export default function App() {
           <Route path="import/github" element={<Import />} />
           <Route path="import/twitter" element={<ImportTwitter />} />
           <Route path="import/activity" element={<ImportActivity />} />
-          <Route path="settings" element={<Dashboard />} />
+          <Route path="settings" element={<SettingsLayout />}>
+            <Route index element={<General />} />
+            <Route path="tokens" element={<Tokens />} />
+            <Route path="danger-zone" element={<DangerZone />} />
+          </Route>
         </Route>
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
