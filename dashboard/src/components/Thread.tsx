@@ -1,7 +1,9 @@
 import { useState, useRef, useEffect, type KeyboardEvent } from 'react';
+import { Link } from 'react-router-dom';
 import { Streamdown } from 'streamdown';
 import 'streamdown/styles.css';
 import { useChat, type ToolCallPart } from '../hooks/useChat';
+import { MemoryCard, type MemoryCardData } from './MemoryCard';
 
 function getToolLabel(toolName: string, args: Record<string, unknown>): { action: string; past: string; detail?: string } {
   switch (toolName) {
@@ -21,6 +23,8 @@ function getToolLabel(toolName: string, args: Record<string, unknown>): { action
       return { action: 'Retrieving memory', past: 'Retrieved memory' };
     case 'deleteMemory':
       return { action: 'Deleting memory', past: 'Deleted memory' };
+    case 'displayMemories':
+      return { action: 'Preparing to display', past: 'Displayed memories' };
     default:
       return { action: toolName, past: toolName };
   }
@@ -192,6 +196,50 @@ function ToolStrip({ tools }: { tools: ToolCallPart[] }) {
   );
 }
 
+function DisplayedMemories({ tools }: { tools: ToolCallPart[] }) {
+  const memories: MemoryCardData[] = tools
+    .filter((t) => t.toolName === 'displayMemories' && t.done && t.output != null && !(t.output as any).error)
+    .flatMap((t) => {
+      const output = t.output as { memories?: any[] };
+      return (output.memories ?? []).map((m: any) => ({
+        id: m.id,
+        title: m.title,
+        contentType: m.contentType,
+        category: m.category || '',
+        summary: m.summary || '',
+        tags: m.tags || [],
+        createdAt: m.createdAt,
+        source: m.source,
+        hasImage: m.hasImage,
+        imageUrl: m.hasImage ? `/api/memories/${m.id}/image` : undefined,
+        extra: m.extra,
+      }));
+    });
+
+  const isLoading = tools.some((t) => t.toolName === 'displayMemories' && !t.done);
+
+  if (memories.length === 0 && !isLoading) return null;
+
+  return (
+    <div className="w-full">
+      {isLoading && (
+        <div className="text-xs italic my-2">
+          <ShimmerText>Loading memories</ShimmerText>
+        </div>
+      )}
+      {memories.length > 0 && (
+        <div className={`grid gap-3 my-2 ${memories.length === 1 ? 'grid-cols-1 max-w-sm' : 'grid-cols-2'}`}>
+          {memories.map((m) => (
+            <Link key={m.id} to={`/memories/${m.id}`} className="block">
+              <MemoryCard memory={m} />
+            </Link>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function Thread() {
   const { messages, isStreaming, send } = useChat();
   const [input, setInput] = useState('');
@@ -336,7 +384,14 @@ export function Thread() {
                     // Render a ToolStrip at the start of each consecutive tool group
                     const group = toolGroupAt.get(i);
                     if (group) {
-                      return <div key={`tools-${i}`} className="my-2"><ToolStrip tools={group.tools} /></div>;
+                      const displayTools = group.tools.filter((t) => t.toolName === 'displayMemories');
+                      const otherTools = group.tools.filter((t) => t.toolName !== 'displayMemories');
+                      return (
+                        <div key={`tools-${i}`}>
+                          {otherTools.length > 0 && <div className="my-2"><ToolStrip tools={otherTools} /></div>}
+                          {displayTools.length > 0 && <DisplayedMemories tools={displayTools} />}
+                        </div>
+                      );
                     }
 
                     return null;
