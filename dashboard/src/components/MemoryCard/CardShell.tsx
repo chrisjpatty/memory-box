@@ -29,7 +29,7 @@ export function CardShell({ id, onDelete, children, className = '' }: CardShellP
     >
       {children}
       {onDelete && (
-        <div ref={menuRef} className="absolute top-2.5 right-2.5 z-10">
+        <div ref={menuRef} className="absolute top-2.5 right-2.5 z-10" onClick={(e) => { e.preventDefault(); e.stopPropagation(); }} onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }}>
           <button
             onClick={() => setMenuOpen((o) => !o)}
             className={`w-6 h-6 rounded-md flex items-center justify-center transition-all duration-150

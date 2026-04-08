@@ -1,24 +1,17 @@
 import { useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { api } from '../api';
+import { useLogin } from '../hooks/queries';
 
 export function Login() {
   const navigate = useNavigate();
+  const login = useLogin();
   const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async (e: FormEvent) => {
+  const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
-    setError('');
-    setLoading(true);
-    try {
-      await api.login(password);
-      navigate('/', { replace: true });
-    } catch (err: any) {
-      setError(err.message || 'Login failed');
-    }
-    setLoading(false);
+    login.mutate(password, {
+      onSuccess: () => navigate('/', { replace: true }),
+    });
   };
 
   return (
@@ -27,9 +20,9 @@ export function Login() {
         <h1 className="text-2xl font-bold mb-1">Memory Box</h1>
         <p className="text-neutral-500 mb-8">Admin Dashboard</p>
 
-        {error && (
+        {login.error && (
           <div className="mb-4 px-4 py-3 rounded-lg text-sm bg-red-950 border border-red-800 text-red-400">
-            {error}
+            {login.error.message || 'Login failed'}
           </div>
         )}
 
@@ -49,10 +42,10 @@ export function Login() {
           />
           <button
             type="submit"
-            disabled={loading}
+            disabled={login.isPending}
             className="mt-4 w-full px-4 py-2.5 bg-white text-black rounded-lg text-sm font-medium hover:bg-neutral-200 disabled:opacity-50 transition-colors"
           >
-            {loading ? 'Signing in...' : 'Sign In'}
+            {login.isPending ? 'Signing in...' : 'Sign In'}
           </button>
         </form>
       </div>

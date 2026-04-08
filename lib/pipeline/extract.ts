@@ -42,6 +42,8 @@ export interface ExtractionResult {
   category?: string;
   /** Classification override (for re-classification after text extraction, e.g. PDF) */
   reclassify?: boolean;
+  /** Override content type (e.g. 'github', 'tweet') — promotes to first-class type */
+  contentType?: string;
 }
 
 interface JinaReaderResponse {
@@ -104,6 +106,10 @@ function processHtml(rawHtml: string, url: string): {
     $('meta[property="og:description"]').attr('content') ||
     $('meta[name="description"]').attr('content') ||
     '';
+  const ogImage =
+    $('meta[property="og:image"]').attr('content') ||
+    $('meta[name="twitter:image"]').attr('content') ||
+    '';
 
   $('script, noscript').remove();
 
@@ -142,7 +148,7 @@ function processHtml(rawHtml: string, url: string): {
   const bodyHtml = $('body').html() || $.html();
   const markdown = turndown.turndown(bodyHtml).slice(0, 100_000);
 
-  return { markdown, title, description, cleanHtml };
+  return { markdown, title, description, cleanHtml, ogImage };
 }
 
 async function fetchStatic(url: string): Promise<{
@@ -173,6 +179,12 @@ async function fetchHtmlSnapshot(url: string): Promise<string | null> {
   }
 }
 
+/** Find the first image URL in markdown content */
+function firstMarkdownImage(md: string): string | null {
+  const match = md.match(/!\[[^\]]*\]\(([^)]+)\)/);
+  return match?.[1] || null;
+}
+
 export async function extractUrl(url: string): Promise<ExtractionResult> {
   const trimmedUrl = url.trim();
 
@@ -189,6 +201,7 @@ export async function extractUrl(url: string): Promise<ExtractionResult> {
       metadata: { ...handlerResult.metadata, url: trimmedUrl },
       tags: handlerResult.tags,
       category: handlerResult.category,
+      contentType: handlerResult.contentType,
     };
   }
 
@@ -200,6 +213,10 @@ export async function extractUrl(url: string): Promise<ExtractionResult> {
   const htmlSnapshot = 'cleanHtml' in rawFetched
     ? (rawFetched as any).cleanHtml
     : await fetchHtmlSnapshot(trimmedUrl);
+
+  // Find a representative image: prefer OG image, fall back to first markdown image
+  const ogImage = 'ogImage' in rawFetched ? (rawFetched as any).ogImage : '';
+  const imageUrl = ogImage || firstMarkdownImage(markdown) || '';
 
   // Add domain as a tag
   const tags: string[] = [];
@@ -217,6 +234,7 @@ export async function extractUrl(url: string): Promise<ExtractionResult> {
       url: trimmedUrl,
       pageTitle: rawFetched.title,
       ...(rawFetched.description ? { metaDescription: rawFetched.description } : {}),
+      ...(imageUrl ? { imageUrl } : {}),
     },
     tags,
   };

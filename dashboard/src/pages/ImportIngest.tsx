@@ -1,8 +1,9 @@
 import { useState, useRef, type FormEvent, type DragEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useIngest } from '../hooks/queries';
+import { ImportTabs } from '../components/ImportTabs';
 
-export function Ingest() {
+export function ImportIngest() {
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const ingest = useIngest();
@@ -65,10 +66,10 @@ export function Ingest() {
 
   return (
     <div className="max-w-3xl">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold mb-1">Ingest</h1>
-        <p className="text-neutral-500 text-sm">Drop anything in — text, a link, an image. It'll figure out the rest.</p>
-      </div>
+      <h1 className="text-2xl font-bold mb-1">Import</h1>
+      <p className="text-neutral-500 text-sm mb-6">Drop anything in — text, a link, an image, a file.</p>
+
+      <ImportTabs />
 
       {result && (
         <div className={`mb-4 px-4 py-3 rounded-lg text-sm ${

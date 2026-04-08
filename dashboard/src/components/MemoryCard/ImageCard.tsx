@@ -5,6 +5,9 @@ import { formatDate } from './types';
 export function ImageCard({ memory, onDelete }: MemoryCardProps) {
   return (
     <CardShell id={memory.id} onDelete={onDelete}>
+      {/* Subtle background glow */}
+      <div className="absolute inset-0 rounded-xl pointer-events-none bg-gradient-to-br from-violet-500/[0.04] to-transparent z-10" />
+
       {/* Image area — the card's hero */}
       <div className="relative aspect-[16/10] bg-neutral-800">
         {memory.hasImage ? (

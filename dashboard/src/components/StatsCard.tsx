@@ -1,12 +1,8 @@
-import { useState, useEffect } from 'react';
-import { api } from '../api';
+import { useStats } from '../hooks/queries';
 
 export function StatsCard() {
-  const [stats, setStats] = useState({ memories: 0, tags: 0, categories: 0 });
-
-  useEffect(() => {
-    api.stats().then(setStats).catch(() => {});
-  }, []);
+  const { data } = useStats();
+  const stats = data ?? { memories: 0, tags: 0, categories: 0 };
 
   const items = [
     { label: 'Memories', value: stats.memories },

@@ -28,7 +28,8 @@ interface MockMemory {
 export function createMockPool() {
   const memories = new Map<string, MockMemory>();
   const chunks: Array<{ memory_id: string; chunk_index: number; text: string; embedding: number[] }> = [];
-  const authTokens: Array<{ token_hash: string; hint: string; active: boolean }> = [];
+  let authTokenSeq = 0;
+  const authTokens: Array<{ id: number; name: string; token_hash: string; hint: string; active: boolean; created_at: string }> = [];
   const sessions = new Map<string, { id: string; expires_at: string }>();
   const jobs = new Map<string, any>();
   const settings = new Map<string, string>();
@@ -132,13 +133,19 @@ export function createMockPool() {
 
     // --- auth_tokens ---
     if (sql.includes('insert into auth_tokens')) {
-      authTokens.push({ token_hash: p[0], hint: p[1], active: true });
-      return { rows: [], rowCount: 1 };
+      const t = { id: ++authTokenSeq, name: p[0], token_hash: p[1], hint: p[2], active: true, created_at: new Date().toISOString() };
+      authTokens.push(t);
+      return { rows: [t], rowCount: 1 };
     }
 
-    if (sql.includes('update auth_tokens') && sql.includes('active = false')) {
-      for (const t of authTokens) t.active = false;
-      return { rows: [], rowCount: authTokens.length };
+    if (sql.includes('update auth_tokens') && sql.includes('where id =')) {
+      const id = p[0];
+      const t = authTokens.find((t) => t.id === id && t.active);
+      if (t) {
+        t.active = false;
+        return { rows: [], rowCount: 1 };
+      }
+      return { rows: [], rowCount: 0 };
     }
 
     if (sql.includes('select') && sql.includes('auth_tokens') && sql.includes('token_hash')) {
@@ -148,13 +155,8 @@ export function createMockPool() {
     }
 
     if (sql.includes('select') && sql.includes('auth_tokens') && sql.includes('active = true')) {
-      const found = authTokens.find((t) => t.active);
-      return { rows: found ? [found] : [], rowCount: found ? 1 : 0 };
-    }
-
-    if (sql.includes('select') && sql.includes('hint') && sql.includes('auth_tokens')) {
-      const found = authTokens.find((t) => t.active);
-      return { rows: found ? [{ hint: found.hint }] : [], rowCount: found ? 1 : 0 };
+      const found = authTokens.filter((t) => t.active).sort((a, b) => b.created_at.localeCompare(a.created_at));
+      return { rows: found, rowCount: found.length };
     }
 
     // --- sessions ---
@@ -250,6 +252,7 @@ export function createMockPool() {
       memories.clear();
       chunks.length = 0;
       authTokens.length = 0;
+      authTokenSeq = 0;
       sessions.clear();
       jobs.clear();
       settings.clear();

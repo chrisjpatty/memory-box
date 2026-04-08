@@ -4,6 +4,9 @@ import type { MemoryCardProps } from './types';
 export function FileCard({ memory, onDelete }: MemoryCardProps) {
   return (
     <CardShell memory={memory} onDelete={onDelete}>
+      {/* Subtle background glow */}
+      <div className="absolute inset-0 rounded-xl pointer-events-none bg-gradient-to-br from-neutral-500/[0.04] to-transparent" />
+
       <div className="flex items-center gap-2 mb-1">
         <span className="text-sm">📎</span>
         {memory.source && (

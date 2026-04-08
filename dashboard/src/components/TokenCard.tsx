@@ -1,45 +1,42 @@
-import { useState, useEffect } from 'react';
-import { api } from '../api';
+import { useState } from 'react';
+import { useTokens, useCreateToken, useRevokeToken } from '../hooks/queries';
 
 export function TokenCard() {
-  const [hint, setHint] = useState<string | null>(null);
-  const [hasToken, setHasToken] = useState(false);
+  const { data, isLoading } = useTokens();
+  const createToken = useCreateToken();
+  const revokeToken = useRevokeToken();
+
+  const [name, setName] = useState('');
   const [revealedToken, setRevealedToken] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
-  const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-  useEffect(() => {
-    api.tokenHint().then((r) => {
-      setHint(r.hint);
-      setHasToken(r.hasToken);
-    });
-  }, []);
+  const tokens = data?.tokens ?? [];
 
-  const handleGenerate = async () => {
-    setLoading(true);
+  const handleCreate = async () => {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    setMessage(null);
     try {
-      const r = await api.tokenGenerate();
+      const r = await createToken.mutateAsync(trimmed);
       setRevealedToken(r.token);
-      setHasToken(true);
-      setMessage({ type: 'success', text: 'Token generated. Copy it now — it won\'t be shown again.' });
+      setName('');
+      setMessage({ type: 'success', text: 'Token created. Copy it now — it won\'t be shown again.' });
     } catch (e: any) {
       setMessage({ type: 'error', text: e.message });
     }
-    setLoading(false);
   };
 
-  const handleRotate = async () => {
-    if (!confirm('Rotate token? The current token will stop working immediately.')) return;
-    setLoading(true);
+  const handleRevoke = async (id: number, tokenName: string) => {
+    if (!confirm(`Revoke token "${tokenName}"? It will stop working immediately.`)) return;
+    setMessage(null);
     try {
-      const r = await api.tokenRotate();
-      setRevealedToken(r.token);
-      setMessage({ type: 'success', text: 'Token rotated. Copy the new one now.' });
+      await revokeToken.mutateAsync(id);
+      setRevealedToken(null);
+      setMessage({ type: 'success', text: `Token "${tokenName}" revoked.` });
     } catch (e: any) {
       setMessage({ type: 'error', text: e.message });
     }
-    setLoading(false);
   };
 
   const handleCopy = () => {
@@ -52,7 +49,7 @@ export function TokenCard() {
 
   return (
     <div className="bg-neutral-900 border border-neutral-800 rounded-xl p-6">
-      <h2 className="text-xs font-semibold uppercase tracking-wider text-neutral-500 mb-4">API Token</h2>
+      <h2 className="text-xs font-semibold uppercase tracking-wider text-neutral-500 mb-4">API Tokens</h2>
 
       {message && (
         <div className={`mb-4 px-4 py-3 rounded-lg text-sm ${
@@ -62,11 +59,9 @@ export function TokenCard() {
         </div>
       )}
 
-      <div className="flex items-center gap-3 bg-neutral-950 border border-neutral-800 rounded-lg px-4 py-3 font-mono text-sm">
-        <span className="flex-1 break-all">
-          {revealedToken || hint || 'No token generated yet'}
-        </span>
-        {revealedToken && (
+      {revealedToken && (
+        <div className="mb-4 flex items-center gap-3 bg-neutral-950 border border-green-800 rounded-lg px-4 py-3 font-mono text-sm">
+          <span className="flex-1 break-all text-green-400">{revealedToken}</span>
           <button
             onClick={handleCopy}
             className={`shrink-0 px-3 py-1 rounded text-xs border transition-colors ${
@@ -75,28 +70,55 @@ export function TokenCard() {
           >
             {copied ? 'Copied!' : 'Copy'}
           </button>
-        )}
+        </div>
+      )}
+
+      {/* Create form */}
+      <div className="flex gap-3 mb-4">
+        <input
+          type="text"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
+          placeholder="Token name (e.g. CLI, CI/CD, Automation)"
+          className="flex-1 bg-neutral-950 border border-neutral-800 rounded-lg px-4 py-2 text-sm text-neutral-200 placeholder-neutral-600 focus:outline-none focus:border-neutral-600"
+        />
+        <button
+          onClick={handleCreate}
+          disabled={!name.trim() || createToken.isPending}
+          className="px-4 py-2 bg-white text-black rounded-lg text-sm font-medium hover:bg-neutral-200 disabled:opacity-50 transition-colors"
+        >
+          Create Token
+        </button>
       </div>
 
-      <div className="flex gap-3 mt-4">
-        {!hasToken ? (
-          <button
-            onClick={handleGenerate}
-            disabled={loading}
-            className="px-4 py-2 bg-white text-black rounded-lg text-sm font-medium hover:bg-neutral-200 disabled:opacity-50 transition-colors"
-          >
-            Generate Token
-          </button>
-        ) : (
-          <button
-            onClick={handleRotate}
-            disabled={loading}
-            className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 disabled:opacity-50 transition-colors"
-          >
-            Rotate Token
-          </button>
-        )}
-      </div>
+      {/* Token list */}
+      {isLoading ? (
+        <div className="text-neutral-500 text-sm">Loading...</div>
+      ) : tokens.length === 0 ? (
+        <div className="text-neutral-500 text-sm">No tokens yet. Create one to get started.</div>
+      ) : (
+        <div className="space-y-2">
+          {tokens.map((t) => (
+            <div key={t.id} className="flex items-center gap-3 bg-neutral-950 border border-neutral-800 rounded-lg px-4 py-3">
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-medium text-neutral-200 truncate">{t.name}</div>
+                <div className="text-xs text-neutral-500 font-mono">{t.hint}</div>
+              </div>
+              <div className="text-xs text-neutral-600 shrink-0">
+                {new Date(t.created_at).toLocaleDateString()}
+              </div>
+              <button
+                onClick={() => handleRevoke(t.id, t.name)}
+                disabled={revokeToken.isPending}
+                className="shrink-0 px-3 py-1 rounded text-xs border border-red-800 text-red-400 hover:bg-red-950 disabled:opacity-50 transition-colors"
+              >
+                Revoke
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

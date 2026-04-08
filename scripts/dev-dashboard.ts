@@ -28,8 +28,9 @@ import { search } from '../ingestion/webhook/api/search';
 import { ingestApi } from '../ingestion/webhook/api/ingest';
 import { importApi } from '../ingestion/webhook/api/import';
 import { chat } from '../ingestion/webhook/api/chat';
-import { startAutoSync } from '../lib/import/github-stars';
+import { jobsApi } from '../ingestion/webhook/api/jobs';
 import { initDatabase } from '../lib/db-init';
+import { initJobSystem } from '../lib/jobs/init';
 
 // Load secrets from ast project config
 try {
@@ -157,11 +158,12 @@ app.route('/api/memories', memories);
 app.route('/api/search', search);
 app.route('/api/ingest', ingestApi);
 app.route('/api/import', importApi);
+app.route('/api/jobs', jobsApi);
 app.route('/api/chat', chat);
 
-// Initialize database and auto-sync
+// Initialize database and job system
 await initDatabase();
-startAutoSync().catch(() => {});
+initJobSystem();
 
 const port = parseInt(process.env.PORT || '3002', 10);
 console.log(`\n  Dashboard API server: http://localhost:${port}`);

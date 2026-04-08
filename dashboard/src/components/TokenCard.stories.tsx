@@ -2,21 +2,27 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { TokenCard } from './TokenCard';
 
 function mockFetch(opts: {
-  hasToken: boolean;
-  hint?: string | null;
-  generatedToken?: string;
+  tokens: { id: number; name: string; hint: string; created_at: string }[];
 }) {
   return async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = typeof input === 'string' ? input : input.toString();
-    if (url.includes('/api/token/hint')) {
+    const method = init?.method ?? 'GET';
+
+    if (url.endsWith('/api/token') && method === 'GET') {
       return new Response(
-        JSON.stringify({ hint: opts.hint ?? null, hasToken: opts.hasToken }),
+        JSON.stringify({ tokens: opts.tokens }),
         { status: 200, headers: { 'Content-Type': 'application/json' } },
       );
     }
-    if (url.includes('/api/token/generate') || url.includes('/api/token/rotate')) {
+    if (url.includes('/api/token/create') && method === 'POST') {
       return new Response(
-        JSON.stringify({ token: opts.generatedToken ?? 'mb_abc123def456ghi789' }),
+        JSON.stringify({ token: 'mb_abc123def456ghi789jkl012mno345pqr678stu901vw' }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      );
+    }
+    if (method === 'DELETE') {
+      return new Response(
+        JSON.stringify({ success: true }),
         { status: 200, headers: { 'Content-Type': 'application/json' } },
       );
     }
@@ -32,17 +38,19 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const NoToken: Story = {
+export const NoTokens: Story = {
   beforeEach: () => {
-    window.fetch = mockFetch({ hasToken: false }) as typeof fetch;
+    window.fetch = mockFetch({ tokens: [] }) as typeof fetch;
   },
 };
 
-export const WithToken: Story = {
+export const WithTokens: Story = {
   beforeEach: () => {
     window.fetch = mockFetch({
-      hasToken: true,
-      hint: 'mb_abc...789',
+      tokens: [
+        { id: 1, name: 'CLI', hint: 'mb_abc1...u901', created_at: '2026-03-15T10:00:00Z' },
+        { id: 2, name: 'CI/CD Pipeline', hint: 'mb_xyz9...w234', created_at: '2026-04-01T14:30:00Z' },
+      ],
     }) as typeof fetch;
   },
 };

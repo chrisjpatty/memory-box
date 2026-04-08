@@ -82,7 +82,6 @@ export async function store(input: StoreInput): Promise<StoreResult> {
     const htmlKey = fileKey(id, 'original.html');
     await putFile(htmlKey, Buffer.from(html, 'utf-8'), 'text/html');
     hasHtml = true;
-    if (!storedFileKey) storedFileKey = htmlKey;
   }
 
   // Single transaction for memory + chunks

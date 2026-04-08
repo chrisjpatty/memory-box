@@ -185,6 +185,7 @@ async function handleRepo(owner: string, repo: string, url: URL): Promise<UrlHan
     description: repoData.description || `GitHub repository: ${repoData.full_name}`,
     tags: [...new Set(tags)],
     category: 'repository',
+    contentType: 'github',
     metadata: {
       githubType: 'repo',
       owner,
@@ -242,6 +243,7 @@ async function handleIssue(owner: string, repo: string, number: number, url: URL
     description: (issue.body || '').slice(0, 300),
     tags: ['github', 'issue', owner.toLowerCase(), repo.toLowerCase(), issue.state, ...labels],
     category: 'issue',
+    contentType: 'github',
     metadata: {
       githubType: 'issue',
       owner,
@@ -297,6 +299,7 @@ async function handlePullRequest(owner: string, repo: string, number: number, ur
     description: (pr.body || '').slice(0, 300),
     tags: ['github', 'pull-request', owner.toLowerCase(), repo.toLowerCase(), state, ...labels],
     category: 'pull-request',
+    contentType: 'github',
     metadata: {
       githubType: 'pull-request',
       owner,

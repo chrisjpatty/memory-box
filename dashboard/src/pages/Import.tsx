@@ -1,5 +1,17 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
-import { api } from '../api';
+import { useState, useEffect } from 'react';
+import { ImportTabs } from '../components/ImportTabs';
+import {
+  useGitHubToken,
+  useSaveGitHubToken,
+  useRemoveGitHubToken,
+  useSyncStatus,
+  useToggleSync,
+  useDiscoverGitHubStars,
+  useActiveJob,
+  useJobStatus,
+  useStartJob,
+  useCancelJob,
+} from '../hooks/queries';
 
 interface RepoInfo {
   url: string;
@@ -25,46 +37,34 @@ interface ProgressState {
   total: number;
   skipped: number;
   failed: number;
-  currentRepo: string;
+  currentItem: string;
   results: JobResult[];
 }
 
 // --- GitHub Settings Section ---
 
-function GitHubSettings({
-  tokenInfo,
-  onTokenSaved,
-  onTokenRemoved,
-  syncStatus,
-  onSyncToggle,
-}: {
-  tokenInfo: any;
-  onTokenSaved: () => void;
-  onTokenRemoved: () => void;
-  syncStatus: any;
-  onSyncToggle: (enabled: boolean) => void;
-}) {
+function GitHubSettings() {
   const [tokenInput, setTokenInput] = useState('');
-  const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
+  const { data: tokenInfo } = useGitHubToken();
+  const { data: syncStatus } = useSyncStatus();
+  const saveToken = useSaveGitHubToken();
+  const removeToken = useRemoveGitHubToken();
+  const toggleSync = useToggleSync();
+
   const handleSave = async () => {
-    setSaving(true);
     setError('');
     try {
-      await api.saveGitHubToken(tokenInput);
+      await saveToken.mutateAsync(tokenInput);
       setTokenInput('');
-      onTokenSaved();
     } catch (err: any) {
       setError(err.message);
-    } finally {
-      setSaving(false);
     }
   };
 
-  const handleRemove = async () => {
-    await api.removeGitHubToken();
-    onTokenRemoved();
+  const handleRemove = () => {
+    removeToken.mutate();
   };
 
   return (
@@ -90,10 +90,10 @@ function GitHubSettings({
             />
             <button
               type="submit"
-              disabled={!tokenInput || saving}
+              disabled={!tokenInput || saveToken.isPending}
               className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-500 disabled:opacity-50 transition-colors"
             >
-              {saving ? 'Saving...' : 'Save Token'}
+              {saveToken.isPending ? 'Saving...' : 'Save Token'}
             </button>
           </form>
           {error && <p className="text-sm text-red-400">{error}</p>}
@@ -122,7 +122,7 @@ function GitHubSettings({
               <input
                 type="checkbox"
                 checked={syncStatus?.enabled || false}
-                onChange={(e) => onSyncToggle(e.target.checked)}
+                onChange={(e) => toggleSync.mutate(e.target.checked)}
                 className="rounded"
               />
               <span className="text-sm text-neutral-300">Auto-import new stars</span>
@@ -142,58 +142,39 @@ function GitHubSettings({
 // --- Reprocess Section ---
 
 function ReprocessSection() {
-  const [reprocess, setReprocess] = useState<any>(null);
+  const [jobId, setJobId] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState('');
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  const activeJob = useActiveJob('reprocess');
+  const jobStatus = useJobStatus(jobId, !!jobId);
+  const startJob = useStartJob();
+  const cancelJob = useCancelJob();
+
+  // Seed jobId from active job on mount
   useEffect(() => {
-    checkActive();
-    return () => { if (pollRef.current) clearInterval(pollRef.current); };
-  }, []);
+    if (activeJob.data?.active && activeJob.data?.id) {
+      setJobId(activeJob.data.id);
+    }
+  }, [activeJob.data]);
 
-  async function checkActive() {
-    try {
-      const data = await api.activeReprocessJob();
-      if (data.active) {
-        setReprocess(data);
-        if (data.status === 'running') startPolling(data.jobId);
-      }
-    } catch { /* no active job */ }
-  }
-
-  function startPolling(id: string) {
-    if (pollRef.current) clearInterval(pollRef.current);
-    pollRef.current = setInterval(async () => {
-      try {
-        const data = await api.reprocessJobStatus(id);
-        setReprocess({ ...data, jobId: id, active: true });
-        if (data.status !== 'running') {
-          clearInterval(pollRef.current!);
-          pollRef.current = null;
-        }
-      } catch {
-        clearInterval(pollRef.current!);
-        pollRef.current = null;
-      }
-    }, 1500);
-  }
+  // Derive reprocess state from hook data
+  const reprocess = jobStatus.data ?? (activeJob.data?.active ? activeJob.data : null);
 
   const handleStart = async () => {
     setError('');
     setConfirming(false);
     try {
-      const { jobId } = await api.startReprocess();
-      setReprocess({ active: true, jobId, status: 'running', completed: 0, total: 0, skipped: 0, failed: 0, currentMemory: '' });
-      startPolling(jobId);
+      const { jobId: newJobId } = await startJob.mutateAsync({ type: 'reprocess' });
+      setJobId(newJobId);
     } catch (err: any) {
       setError(err.message);
     }
   };
 
-  const handleCancel = async () => {
-    if (!reprocess?.jobId) return;
-    try { await api.cancelReprocess(reprocess.jobId); } catch { /* polling will update */ }
+  const handleCancel = () => {
+    if (!jobId) return;
+    cancelJob.mutate(jobId);
   };
 
   const isDone = reprocess && reprocess.status !== 'running';
@@ -264,9 +245,9 @@ function ReprocessSection() {
             {reprocess.failed > 0 && <span className="text-red-400">{reprocess.failed} failed</span>}
           </div>
 
-          {reprocess.currentMemory && (
+          {reprocess.currentItem && (
             <p className="text-xs text-neutral-500 truncate">
-              Current: <span className="text-neutral-400">{reprocess.currentMemory}</span>
+              Current: <span className="text-neutral-400">{reprocess.currentItem}</span>
             </p>
           )}
         </div>
@@ -278,102 +259,54 @@ function ReprocessSection() {
 // --- Main Import Page ---
 
 export function Import() {
-  // Token & sync state
-  const [tokenInfo, setTokenInfo] = useState<any>(null);
-  const [syncStatus, setSyncStatus] = useState<any>(null);
-
-  // Discovery state
+  // Discovery state (local UI state)
   const [username, setUsername] = useState('');
   const [discovering, setDiscovering] = useState(false);
   const [repos, setRepos] = useState<RepoInfo[] | null>(null);
   const [discoverMeta, setDiscoverMeta] = useState<{ privateExcluded: number; rateLimit: any } | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
-
-  // Import state — driven entirely by backend polling
-  const [progress, setProgress] = useState<ProgressState | null>(null);
   const [importError, setImportError] = useState('');
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Load token info and sync status on mount
-  const refreshTokenInfo = useCallback(async () => {
-    try {
-      const info = await api.getGitHubToken();
-      setTokenInfo(info);
-      if (info?.username) setUsername(info.username);
-    } catch (err) {
-      console.warn('Failed to fetch token info:', err);
-      setTokenInfo({ hasToken: false });
-    }
-    try {
-      const sync = await api.syncStatus();
-      setSyncStatus(sync);
-    } catch (err) {
-      console.warn('Failed to fetch sync status:', err);
-      setSyncStatus({ enabled: false });
-    }
-  }, []);
+  // Job tracking state
+  const [jobId, setJobId] = useState<string | null>(null);
 
-  useEffect(() => { refreshTokenInfo(); }, [refreshTokenInfo]);
+  // Hooks for data fetching
+  const { data: tokenInfo } = useGitHubToken();
+  const activeJob = useActiveJob('github-import');
+  const jobStatus = useJobStatus(jobId, !!jobId);
+  const discoverStars = useDiscoverGitHubStars();
+  const startJob = useStartJob();
+  const cancelJob = useCancelJob();
 
-  // On mount: check if there's an active import job running on the backend
+  // Set username from token info
   useEffect(() => {
-    checkForActiveJob();
-    return () => stopPolling();
-  }, []);
+    if (tokenInfo?.username) setUsername(tokenInfo.username);
+  }, [tokenInfo]);
 
-  async function checkForActiveJob() {
-    try {
-      const data = await api.activeImportJob();
-      if (data.active && data.jobId) {
-        setProgress({
-          jobId: data.jobId,
-          status: data.status,
-          completed: data.completed,
-          total: data.total,
-          skipped: data.skipped,
-          failed: data.failed,
-          currentRepo: data.currentRepo,
-          results: data.results || [],
-        });
-        if (data.status === 'running') {
-          startPolling(data.jobId);
-        }
-      }
-    } catch { /* no active job */ }
-  }
-
-  function startPolling(id: string) {
-    stopPolling();
-    pollRef.current = setInterval(async () => {
-      try {
-        const data = await api.importJobStatus(id);
-        setProgress({
-          jobId: id,
-          status: data.status,
-          completed: data.completed,
-          total: data.total,
-          skipped: data.skipped,
-          failed: data.failed,
-          currentRepo: data.currentRepo,
-          results: data.results || [],
-        });
-        // Stop polling when done
-        if (data.status !== 'running') {
-          stopPolling();
-        }
-      } catch {
-        // Job might have expired — stop polling
-        stopPolling();
-      }
-    }, 1500);
-  }
-
-  function stopPolling() {
-    if (pollRef.current) {
-      clearInterval(pollRef.current);
-      pollRef.current = null;
+  // Seed jobId from active job on mount
+  useEffect(() => {
+    if (activeJob.data?.active && activeJob.data?.id) {
+      setJobId(activeJob.data.id);
     }
-  }
+  }, [activeJob.data]);
+
+  // Derive progress from hook data
+  const progress: ProgressState | null = (() => {
+    const data = jobStatus.data ?? (activeJob.data?.active ? activeJob.data : null);
+    if (!data) return null;
+    const id = jobId ?? activeJob.data?.id;
+    if (!id) return null;
+    return {
+      jobId: id,
+      status: data.status,
+      completed: data.completed,
+      total: data.total,
+      skipped: data.skipped,
+      failed: data.failed,
+      currentItem: data.currentItem,
+      results: data.results || [],
+    };
+  })();
 
   // --- Actions ---
 
@@ -383,7 +316,7 @@ export function Import() {
     setRepos(null);
     setImportError('');
     try {
-      const result = await api.discoverGitHubStars(username);
+      const result = await discoverStars.mutateAsync({ username });
       setRepos(result.repos);
       setDiscoverMeta({ privateExcluded: result.privateExcluded, rateLimit: result.rateLimit });
       const newRepos = new Set<string>(result.repos.filter((r: RepoInfo) => !r.alreadyImported).map((r: RepoInfo) => r.url));
@@ -401,41 +334,20 @@ export function Import() {
     setImportError('');
 
     try {
-      const { jobId } = await api.startGitHubImport(repoUrls);
-      setProgress({
-        jobId,
-        status: 'running',
-        completed: 0,
-        total: repoUrls.length,
-        skipped: 0,
-        failed: 0,
-        currentRepo: '',
-        results: [],
-      });
-      startPolling(jobId);
+      const { jobId: newJobId } = await startJob.mutateAsync({ type: 'github-import', payload: { repos: repoUrls } });
+      setJobId(newJobId);
     } catch (err: any) {
       setImportError(err.message);
     }
   };
 
-  const handleCancel = async () => {
+  const handleCancel = () => {
     if (!progress?.jobId) return;
-    try {
-      await api.cancelGitHubImport(progress.jobId);
-    } catch { /* polling will pick up the state change */ }
-  };
-
-  const handleSyncToggle = async (enabled: boolean) => {
-    try {
-      if (enabled) await api.enableSync();
-      else await api.disableSync();
-      setSyncStatus((prev: any) => ({ ...prev, enabled }));
-    } catch { /* ignore */ }
+    cancelJob.mutate(progress.jobId);
   };
 
   const handleReset = () => {
-    stopPolling();
-    setProgress(null);
+    setJobId(null);
     setRepos(null);
     setSelected(new Set());
   };
@@ -451,13 +363,9 @@ export function Import() {
       <h1 className="text-2xl font-bold mb-1">Import</h1>
       <p className="text-sm text-neutral-500 mb-6">Import your GitHub starred repositories into Memory Box</p>
 
-      <GitHubSettings
-        tokenInfo={tokenInfo}
-        onTokenSaved={refreshTokenInfo}
-        onTokenRemoved={() => { setTokenInfo({ hasToken: false }); setSyncStatus({ enabled: false }); }}
-        syncStatus={syncStatus}
-        onSyncToggle={handleSyncToggle}
-      />
+      <ImportTabs />
+
+      <GitHubSettings />
 
       {importError && (
         <div className="bg-red-900/30 border border-red-800 rounded-lg px-4 py-3 mb-4 text-sm text-red-400">
@@ -509,9 +417,9 @@ export function Import() {
           </div>
 
           {/* Current repo */}
-          {progress.currentRepo && !isDone && (
+          {progress.currentItem && !isDone && (
             <p className="text-xs text-neutral-500 mb-3 truncate">
-              Processing: <span className="text-neutral-400">{progress.currentRepo.replace('https://github.com/', '')}</span>
+              Processing: <span className="text-neutral-400">{progress.currentItem.replace('https://github.com/', '')}</span>
             </p>
           )}
 

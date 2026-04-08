@@ -4,9 +4,10 @@ import { Chat } from './pages/Chat';
 import { Dashboard } from './pages/Dashboard';
 import { Memories } from './pages/Memories';
 import { MemoryView } from './pages/MemoryView';
-import { Search } from './pages/Search';
-import { Ingest } from './pages/Ingest';
 import { Import } from './pages/Import';
+import { ImportTwitter } from './pages/ImportTwitter';
+import { ImportIngest } from './pages/ImportIngest';
+import { Jobs } from './pages/Jobs';
 import { Layout } from './components/Layout';
 import { ProtectedRoute } from './components/ProtectedRoute';
 
@@ -19,9 +20,10 @@ export default function App() {
           <Route index element={<Chat />} />
           <Route path="memories" element={<Memories />} />
           <Route path="memories/:id" element={<MemoryView />} />
-          <Route path="search" element={<Search />} />
-          <Route path="ingest" element={<Ingest />} />
-          <Route path="import" element={<Import />} />
+          <Route path="import" element={<ImportIngest />} />
+          <Route path="import/github" element={<Import />} />
+          <Route path="import/twitter" element={<ImportTwitter />} />
+          <Route path="jobs" element={<Jobs />} />
           <Route path="settings" element={<Dashboard />} />
         </Route>
       </Route>

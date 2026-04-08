@@ -69,11 +69,22 @@ CREATE INDEX IF NOT EXISTS idx_chunks_embedding ON memory_chunks USING hnsw (emb
 -- Auth tokens (bearer tokens for API ingestion)
 CREATE TABLE IF NOT EXISTS auth_tokens (
   id          SERIAL PRIMARY KEY,
+  name        TEXT NOT NULL DEFAULT 'default',
   token_hash  TEXT NOT NULL UNIQUE,
   hint        TEXT,
   active      BOOLEAN DEFAULT TRUE,
   created_at  TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Migration: add name column if it doesn't exist (for existing databases)
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'auth_tokens' AND column_name = 'name'
+  ) THEN
+    ALTER TABLE auth_tokens ADD COLUMN name TEXT NOT NULL DEFAULT 'default';
+  END IF;
+END $$;
 
 -- Dashboard sessions
 CREATE TABLE IF NOT EXISTS sessions (
@@ -97,6 +108,17 @@ CREATE TABLE IF NOT EXISTS jobs (
   started_at    TIMESTAMPTZ DEFAULT NOW(),
   completed_at  TIMESTAMPTZ
 );
+
+-- Job system: add payload and parent_job_id columns
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS payload JSONB DEFAULT '{}';
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS parent_job_id TEXT REFERENCES jobs(id) ON DELETE SET NULL;
+
+-- Migrate legacy type names
+UPDATE jobs SET type = 'github-import' WHERE type = 'import';
+
+-- Job lookup indexes
+CREATE INDEX IF NOT EXISTS idx_jobs_type_status ON jobs (type, status);
+CREATE INDEX IF NOT EXISTS idx_jobs_parent ON jobs (parent_job_id) WHERE parent_job_id IS NOT NULL;
 
 -- Key-value settings (GitHub token, sync config)
 CREATE TABLE IF NOT EXISTS settings (

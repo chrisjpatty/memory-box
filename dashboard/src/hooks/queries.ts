@@ -1,22 +1,24 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api';
 
 // --- Query Keys ---
 
 export const queryKeys = {
   authStatus: ['auth', 'status'] as const,
-  tokenHint: ['token', 'hint'] as const,
+  tokens: ['tokens'] as const,
   stats: ['stats'] as const,
   memories: (params?: { type?: string; tag?: string; category?: string; limit?: number; skip?: number }) =>
     ['memories', params ?? {}] as const,
+  infiniteMemories: (type?: string) => ['memories', 'infinite', type ?? ''] as const,
   memory: (id: string) => ['memories', id] as const,
   search: (query: string) => ['search', query] as const,
   githubToken: ['github', 'token'] as const,
   syncStatus: ['github', 'sync'] as const,
-  activeImportJob: ['github', 'import', 'active'] as const,
-  importJobStatus: (jobId: string) => ['github', 'import', jobId] as const,
-  activeReprocessJob: ['reprocess', 'active'] as const,
-  reprocessJobStatus: (jobId: string) => ['reprocess', jobId] as const,
+  twitterStatus: ['twitter', 'status'] as const,
+  activeJob: (type: string) => ['jobs', 'active', type] as const,
+  jobStatus: (jobId: string) => ['jobs', jobId] as const,
+  activeJobs: ['jobs', 'active'] as const,
+  jobHistory: ['jobs', 'history'] as const,
 };
 
 // --- Auth ---
@@ -50,31 +52,31 @@ export function useLogout() {
   });
 }
 
-// --- Token ---
+// --- Tokens ---
 
-export function useTokenHint() {
+export function useTokens() {
   return useQuery({
-    queryKey: queryKeys.tokenHint,
-    queryFn: () => api.tokenHint(),
+    queryKey: queryKeys.tokens,
+    queryFn: () => api.listTokens(),
   });
 }
 
-export function useGenerateToken() {
+export function useCreateToken() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: () => api.tokenGenerate(),
+    mutationFn: (name: string) => api.createToken(name),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: queryKeys.tokenHint });
+      qc.invalidateQueries({ queryKey: queryKeys.tokens });
     },
   });
 }
 
-export function useRotateToken() {
+export function useRevokeToken() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: () => api.tokenRotate(),
+    mutationFn: (id: number) => api.revokeToken(id),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: queryKeys.tokenHint });
+      qc.invalidateQueries({ queryKey: queryKeys.tokens });
     },
   });
 }
@@ -94,6 +96,20 @@ export function useMemories(params?: { type?: string; tag?: string; category?: s
   return useQuery({
     queryKey: queryKeys.memories(params),
     queryFn: () => api.memories(params),
+  });
+}
+
+const PAGE_SIZE = 40;
+
+export function useInfiniteMemories(type?: string) {
+  return useInfiniteQuery({
+    queryKey: queryKeys.infiniteMemories(type),
+    queryFn: ({ pageParam }) => api.memories({ type: type || undefined, limit: PAGE_SIZE, skip: pageParam }),
+    initialPageParam: 0,
+    getNextPageParam: (lastPage, allPages) => {
+      const loaded = allPages.reduce((sum, p) => sum + p.memories.length, 0);
+      return loaded < lastPage.total ? loaded : undefined;
+    },
   });
 }
 
@@ -176,32 +192,7 @@ export function useDiscoverGitHubStars() {
 export function useStartGitHubImport() {
   return useMutation({
     mutationFn: ({ repos, token }: { repos: string[]; token?: string }) =>
-      api.startGitHubImport(repos, token),
-  });
-}
-
-export function useActiveImportJob() {
-  return useQuery({
-    queryKey: queryKeys.activeImportJob,
-    queryFn: () => api.activeImportJob(),
-  });
-}
-
-export function useImportJobStatus(jobId: string | null, enabled: boolean) {
-  return useQuery({
-    queryKey: queryKeys.importJobStatus(jobId!),
-    queryFn: () => api.importJobStatus(jobId!),
-    enabled: enabled && !!jobId,
-    refetchInterval: (query) => {
-      const data = query.state.data;
-      return data?.status === 'running' ? 1500 : false;
-    },
-  });
-}
-
-export function useCancelGitHubImport() {
-  return useMutation({
-    mutationFn: (jobId: string) => api.cancelGitHubImport(jobId),
+      api.startJob('github-import', { repos, githubToken: token }),
   });
 }
 
@@ -222,19 +213,67 @@ export function useToggleSync() {
   });
 }
 
-// --- Reprocessing ---
+// --- Twitter Import ---
 
-export function useActiveReprocessJob() {
+export function useTwitterStatus() {
   return useQuery({
-    queryKey: queryKeys.activeReprocessJob,
-    queryFn: () => api.activeReprocessJob(),
+    queryKey: queryKeys.twitterStatus,
+    queryFn: () => api.getTwitterStatus(),
   });
 }
 
-export function useReprocessJobStatus(jobId: string | null, enabled: boolean) {
+export function useSaveTwitterCredentials() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ clientId, clientSecret }: { clientId: string; clientSecret: string }) =>
+      api.saveTwitterCredentials(clientId, clientSecret),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.twitterStatus });
+    },
+  });
+}
+
+export function useDisconnectTwitter() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.disconnectTwitter(),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.twitterStatus });
+    },
+  });
+}
+
+export function useGetTwitterAuthUrl() {
+  return useMutation({
+    mutationFn: () => api.getTwitterAuthUrl(),
+  });
+}
+
+export function useDiscoverTwitterBookmarks() {
+  return useMutation({
+    mutationFn: (folderId?: string) => api.discoverTwitterBookmarks(folderId),
+  });
+}
+
+export function useUploadTwitterExport() {
+  return useMutation({
+    mutationFn: (file: File) => api.uploadTwitterExport(file),
+  });
+}
+
+// --- Unified Job Hooks ---
+
+export function useActiveJob(type: string) {
   return useQuery({
-    queryKey: queryKeys.reprocessJobStatus(jobId!),
-    queryFn: () => api.reprocessJobStatus(jobId!),
+    queryKey: queryKeys.activeJob(type),
+    queryFn: () => api.activeJob(type),
+  });
+}
+
+export function useJobStatus(jobId: string | null, enabled: boolean) {
+  return useQuery({
+    queryKey: queryKeys.jobStatus(jobId!),
+    queryFn: () => api.jobStatus(jobId!),
     enabled: enabled && !!jobId,
     refetchInterval: (query) => {
       const data = query.state.data;
@@ -243,18 +282,39 @@ export function useReprocessJobStatus(jobId: string | null, enabled: boolean) {
   });
 }
 
-export function useStartReprocess() {
+export function useActiveJobs() {
+  return useQuery({
+    queryKey: queryKeys.activeJobs,
+    queryFn: () => api.listJobs({ status: 'running', limit: 10 }),
+    refetchInterval: 1500,
+  });
+}
+
+export function useJobHistory() {
+  return useQuery({
+    queryKey: queryKeys.jobHistory,
+    queryFn: () => api.listJobs({ limit: 25 }),
+  });
+}
+
+export function useStartJob() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: () => api.startReprocess(),
+    mutationFn: ({ type, payload }: { type: string; payload?: any }) =>
+      api.startJob(type, payload),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: queryKeys.activeReprocessJob });
+      qc.invalidateQueries({ queryKey: queryKeys.activeJobs });
     },
   });
 }
 
-export function useCancelReprocess() {
+export function useCancelJob() {
+  const qc = useQueryClient();
   return useMutation({
-    mutationFn: (jobId: string) => api.cancelReprocess(jobId),
+    mutationFn: (jobId: string) => api.cancelJob(jobId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.activeJobs });
+      qc.invalidateQueries({ queryKey: queryKeys.jobHistory });
+    },
   });
 }

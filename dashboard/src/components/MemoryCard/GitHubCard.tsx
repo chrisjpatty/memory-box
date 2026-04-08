@@ -65,6 +65,9 @@ function GitHubRepoCard({ memory, onDelete }: MemoryCardProps) {
 
   return (
     <CardShell id={memory.id} onDelete={onDelete}>
+      {/* Subtle background glow */}
+      <div className="absolute inset-0 rounded-xl pointer-events-none bg-gradient-to-br from-emerald-500/[0.04] to-transparent z-10" />
+
       {/* README hero image */}
       {extra.readmeImage && (
         <div className="relative aspect-[2.4/1] bg-neutral-800 overflow-hidden">
@@ -75,11 +78,6 @@ function GitHubRepoCard({ memory, onDelete }: MemoryCardProps) {
           />
           <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-neutral-900 via-neutral-900/60 to-transparent" />
         </div>
-      )}
-
-      {/* Subtle green top edge (only when no image) */}
-      {!extra.readmeImage && (
-        <div className="h-px bg-gradient-to-r from-transparent via-emerald-500/40 to-transparent" />
       )}
 
       <div className={extra.readmeImage ? 'px-4 pb-4 -mt-3 relative' : 'p-4'}>
@@ -168,6 +166,9 @@ function GitHubIssueCard({ memory, onDelete }: MemoryCardProps) {
 
   return (
     <CardShell id={memory.id} onDelete={onDelete}>
+      {/* Subtle background glow */}
+      <div className="absolute inset-0 rounded-xl pointer-events-none bg-gradient-to-br from-emerald-500/[0.04] to-transparent" />
+
       <div className="p-4">
         {/* Repo + number reference */}
         <div className="flex items-center gap-2 mb-2">

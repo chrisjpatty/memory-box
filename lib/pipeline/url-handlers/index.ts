@@ -20,6 +20,8 @@ export interface UrlHandlerResult {
   tags: string[];
   /** Override category (e.g. 'repository', 'issue', 'tweet') */
   category?: string;
+  /** Override content type (e.g. 'github', 'tweet') — promotes to first-class type */
+  contentType?: string;
   /** Cleaned HTML for iframe rendering (optional) */
   cleanHtml?: string;
 }
@@ -34,12 +36,14 @@ export interface UrlHandler {
 }
 
 import { githubHandler } from './github';
+import { twitterHandler } from './twitter';
 
 /**
  * Registered handlers, checked in order. First match wins.
  */
 const handlers: UrlHandler[] = [
   githubHandler,
+  twitterHandler,
 ];
 
 /**

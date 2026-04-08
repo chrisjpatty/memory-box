@@ -19,9 +19,9 @@ export const api = {
   login: (password: string) => request<{ ok: boolean }>('/api/auth/login', { method: 'POST', body: JSON.stringify({ password }) }),
   logout: () => request<{ ok: boolean }>('/api/auth/logout', { method: 'POST' }),
 
-  tokenHint: () => request<{ hint: string | null; hasToken: boolean }>('/api/token/hint'),
-  tokenGenerate: () => request<{ token: string }>('/api/token/generate', { method: 'POST' }),
-  tokenRotate: () => request<{ token: string }>('/api/token/rotate', { method: 'POST' }),
+  listTokens: () => request<{ tokens: { id: number; name: string; hint: string; created_at: string }[] }>('/api/token'),
+  createToken: (name: string) => request<{ token: string }>('/api/token/create', { method: 'POST', body: JSON.stringify({ name }) }),
+  revokeToken: (id: number) => request<{ success: boolean }>(`/api/token/${id}`, { method: 'DELETE' }),
 
   stats: () => request<{ memories: number; tags: number; categories: number }>('/api/stats'),
 
@@ -43,7 +43,7 @@ export const api = {
   ingest: (data: { content: string; title?: string; tags?: string[] }) =>
     request<{ success: boolean; memoryId: string; contentType: string; title: string; chunks: number }>('/api/ingest', { method: 'POST', body: JSON.stringify(data) }),
 
-  // GitHub import
+  // GitHub token & discovery (non-job routes)
   saveGitHubToken: (token: string) =>
     request<{ success: boolean; username: string; hint: string }>('/api/import/github/token', { method: 'POST', body: JSON.stringify({ token }) }),
   getGitHubToken: () =>
@@ -52,14 +52,6 @@ export const api = {
     request<{ success: boolean }>('/api/import/github/token', { method: 'DELETE' }),
   discoverGitHubStars: (username: string, token?: string) =>
     request<any>('/api/import/github/discover', { method: 'POST', body: JSON.stringify({ username, token }) }),
-  startGitHubImport: (repos: string[], token?: string) =>
-    request<{ jobId: string }>('/api/import/github/start', { method: 'POST', body: JSON.stringify({ repos, token }) }),
-  activeImportJob: () =>
-    request<any>('/api/import/github/active'),
-  importJobStatus: (jobId: string) =>
-    request<any>(`/api/import/github/${jobId}/status`),
-  cancelGitHubImport: (jobId: string) =>
-    request<{ success: boolean; message: string }>(`/api/import/github/${jobId}/cancel`, { method: 'POST' }),
   enableSync: () =>
     request<{ success: boolean }>('/api/import/github/sync/enable', { method: 'POST' }),
   disableSync: () =>
@@ -67,13 +59,50 @@ export const api = {
   syncStatus: () =>
     request<{ enabled: boolean; lastCheck?: string; nextCheck?: string }>('/api/import/github/sync/status'),
 
-  // Reprocessing
-  startReprocess: () =>
-    request<{ jobId: string }>('/api/import/reprocess/start', { method: 'POST' }),
-  activeReprocessJob: () =>
-    request<any>('/api/import/reprocess/active'),
-  reprocessJobStatus: (jobId: string) =>
-    request<any>(`/api/import/reprocess/${jobId}/status`),
-  cancelReprocess: (jobId: string) =>
-    request<{ success: boolean }>(`/api/import/reprocess/${jobId}/cancel`, { method: 'POST' }),
+  // Twitter OAuth 2.0 & discovery
+  saveTwitterCredentials: (clientId: string, clientSecret: string) =>
+    request<{ success: boolean }>('/api/import/twitter/credentials', { method: 'POST', body: JSON.stringify({ clientId, clientSecret }) }),
+  getTwitterStatus: () =>
+    request<{ hasCredentials: boolean; hasToken: boolean; username?: string; userId?: string }>('/api/import/twitter/status'),
+  getTwitterAuthUrl: () =>
+    request<{ url: string }>('/api/import/twitter/authorize'),
+  disconnectTwitter: () =>
+    request<{ success: boolean }>('/api/import/twitter/disconnect', { method: 'DELETE' }),
+  discoverTwitterBookmarks: (folderId?: string) =>
+    request<any>('/api/import/twitter/discover', { method: 'POST', body: JSON.stringify({ folderId }) }),
+  uploadTwitterExport: async (file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const res = await fetch('/api/import/twitter/upload', {
+      method: 'POST',
+      credentials: 'include',
+      body: formData,
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body.error || `Upload failed: ${res.status}`);
+    }
+    return res.json();
+  },
+  getTwitterFolders: () =>
+    request<{ folders: { id: string; name: string }[] }>('/api/import/twitter/folders'),
+
+  // Unified job system
+  startJob: (type: string, payload?: any) =>
+    request<{ jobId: string }>('/api/jobs', { method: 'POST', body: JSON.stringify({ type, payload }) }),
+  activeJob: (type: string) =>
+    request<any>(`/api/jobs/active/${type}`),
+  jobStatus: (jobId: string) =>
+    request<any>(`/api/jobs/${jobId}`),
+  cancelJob: (jobId: string) =>
+    request<{ success: boolean; message: string }>(`/api/jobs/${jobId}/cancel`, { method: 'POST' }),
+  listJobs: (params?: { type?: string; status?: string; limit?: number; offset?: number }) => {
+    const qs = new URLSearchParams();
+    if (params?.type) qs.set('type', params.type);
+    if (params?.status) qs.set('status', params.status);
+    if (params?.limit) qs.set('limit', String(params.limit));
+    if (params?.offset) qs.set('offset', String(params.offset));
+    const query = qs.toString();
+    return request<{ jobs: any[]; total: number }>(`/api/jobs${query ? `?${query}` : ''}`);
+  },
 };

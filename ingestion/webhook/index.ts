@@ -12,7 +12,8 @@ import { search } from './api/search';
 import { ingestApi } from './api/ingest';
 import { importApi } from './api/import';
 import { chat } from './api/chat';
-import { startAutoSync } from '../../lib/import/github-stars';
+import { jobsApi } from './api/jobs';
+import { initJobSystem } from '../../lib/jobs/init';
 import type { IngestRequest } from '../../lib/types';
 
 const app = new Hono();
@@ -25,8 +26,9 @@ app.get('/health', (c) => c.json({ status: 'ok' }));
 // Auth routes (no session required)
 app.route('/api/auth', auth);
 
-// Session-protected API routes
+// Session-protected API routes (skip Twitter OAuth callback — it's validated by PKCE state)
 app.use('/api/*', async (c, next) => {
+  if (c.req.path === '/api/import/twitter/callback') return next();
   const authenticated = await validateSession(c);
   if (!authenticated) {
     return c.json({ error: 'Unauthorized' }, 401);
@@ -40,6 +42,7 @@ app.route('/api/memories', memories);
 app.route('/api/search', search);
 app.route('/api/ingest', ingestApi);
 app.route('/api/import', importApi);
+app.route('/api/jobs', jobsApi);
 app.route('/api/chat', chat);
 
 // --- Ingestion routes (bearer token auth) ---
@@ -123,11 +126,9 @@ app.get('/*', serveStatic({ path: './dashboard/dist/index.html' }));
 
 // Initialize database and start server
 await initDatabase();
+initJobSystem();
 
 const port = parseInt(process.env.PORT || '3001', 10);
 console.log(`Memory Box ingestion webhook listening on port ${port}`);
-
-// Initialize auto-sync if it was previously enabled
-startAutoSync().catch((err) => console.warn('Auto-sync startup failed:', err));
 
 export default { port, fetch: app.fetch };

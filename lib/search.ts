@@ -19,6 +19,8 @@ interface SearchHit {
   category: string;
   createdAt: string;
   source?: string;
+  hasImage?: boolean;
+  extra?: Record<string, string>;
 }
 
 /**
@@ -32,7 +34,7 @@ async function vectorSearch(queryText: string, limit: number): Promise<SearchHit
        mc.memory_id, mc.text AS snippet,
        1 - (mc.embedding <=> $1::vector) AS score,
        m.title, m.content_type, m.summary, m.tags, m.category,
-       m.created_at, m.source_url
+       m.created_at, m.source_url, m.metadata, m.file_key
      FROM memory_chunks mc
      JOIN memories m ON m.id = mc.memory_id
      ORDER BY mc.memory_id, mc.embedding <=> $1::vector
@@ -55,6 +57,8 @@ async function vectorSearch(queryText: string, limit: number): Promise<SearchHit
       category: r.category || '',
       createdAt: r.created_at?.toISOString?.() || r.created_at || '',
       source: r.source_url,
+      hasImage: r.file_key != null && !r.file_key.endsWith('/original.html'),
+      extra: r.metadata || {},
     }));
 }
 
@@ -65,7 +69,7 @@ async function keywordSearch(queryText: string, limit: number): Promise<SearchHi
   try {
     const result = await query(
       `SELECT m.id AS memory_id, m.title, m.content_type, m.summary, m.tags,
-              m.category, m.created_at, m.source_url,
+              m.category, m.created_at, m.source_url, m.metadata, m.file_key,
               LEFT(m.search_content, 300) AS snippet,
               ts_rank(m.search_vector, plainto_tsquery('english', $1)) AS score
        FROM memories m
@@ -86,6 +90,8 @@ async function keywordSearch(queryText: string, limit: number): Promise<SearchHi
       category: r.category || '',
       createdAt: r.created_at?.toISOString?.() || r.created_at || '',
       source: r.source_url,
+      hasImage: r.file_key != null && !r.file_key.endsWith('/original.html'),
+      extra: r.metadata || {},
     }));
   } catch (e: any) {
     console.warn('Keyword search failed, falling back to vector-only:', e.message);

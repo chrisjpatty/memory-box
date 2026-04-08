@@ -5,10 +5,10 @@ import { formatDate } from './types';
 export function TextCard({ memory, onDelete }: MemoryCardProps) {
   return (
     <CardShell id={memory.id} onDelete={onDelete}>
-      {/* Warm amber accent bar */}
-      <div className="absolute left-0 top-0 bottom-0 w-[3px] bg-gradient-to-b from-amber-400 via-amber-500 to-amber-700/40" />
+      {/* Subtle background glow */}
+      <div className="absolute inset-0 rounded-xl pointer-events-none bg-gradient-to-br from-amber-500/[0.04] to-transparent" />
 
-      <div className="pl-5 pr-4 py-4">
+      <div className="p-4">
         {/* Decorative quotation mark */}
         <span className="absolute top-1 right-4 text-[72px] font-serif leading-none text-amber-500/[0.07] select-none pointer-events-none">
           &ldquo;

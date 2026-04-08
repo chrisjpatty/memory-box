@@ -10,18 +10,15 @@ import { FileCard } from './FileCard';
 export type { MemoryCardData, MemoryCardProps };
 
 export function MemoryCard({ memory, onDelete }: MemoryCardProps) {
-  // GitHub memories are stored as contentType 'url' with extra.githubType
-  if (memory.extra?.githubType) {
-    return <GitHubCard memory={memory} onDelete={onDelete} />;
-  }
-
-  // Tweet memories are stored as contentType 'url' with extra.tweetId
-  if (memory.extra?.tweetId) {
-    return <TweetCard memory={memory} onDelete={onDelete} />;
-  }
-
   switch (memory.contentType) {
+    case 'tweet':
+      return <TweetCard memory={memory} onDelete={onDelete} />;
+    case 'github':
+      return <GitHubCard memory={memory} onDelete={onDelete} />;
     case 'url':
+      // Legacy: GitHub/tweet memories stored as 'url' with extra fields
+      if (memory.extra?.githubType) return <GitHubCard memory={memory} onDelete={onDelete} />;
+      if (memory.extra?.tweetId) return <TweetCard memory={memory} onDelete={onDelete} />;
       return <URLCard memory={memory} onDelete={onDelete} />;
     case 'image':
       return <ImageCard memory={memory} onDelete={onDelete} />;

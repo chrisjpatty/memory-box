@@ -1,14 +1,23 @@
 import { Hono } from 'hono';
-import { query } from '../../../lib/db';
 import { saveGitHubToken, getGitHubToken, removeGitHubToken, getTokenInfo } from '../../../lib/import/token-store';
-import { startReprocessJob } from '../../../lib/import/reprocess';
 import {
   discoverStars,
-  startImportJob,
   enableAutoSync,
   disableAutoSync,
   getSyncStatus,
 } from '../../../lib/import/github-stars';
+import {
+  saveTwitterCredentials,
+  getTwitterTokenInfo,
+  generateAuthUrl,
+  handleOAuthCallback,
+  removeTwitterConnection,
+} from '../../../lib/import/twitter-token-store';
+import {
+  discoverBookmarks,
+  discoverBookmarkFolders,
+  parseBookmarksFromExport,
+} from '../../../lib/import/twitter-bookmarks';
 
 const importApi = new Hono();
 
@@ -56,7 +65,7 @@ importApi.post('/github/discover', async (c) => {
   }
 });
 
-// --- Auto-Sync (must be before /:jobId routes to avoid param collision) ---
+// --- Auto-Sync ---
 
 importApi.post('/github/sync/enable', async (c) => {
   const token = await getGitHubToken();
@@ -76,157 +85,109 @@ importApi.get('/github/sync/status', async (c) => {
   return c.json(status);
 });
 
-// --- Import Job ---
+// --- Twitter OAuth 2.0 ---
 
-importApi.post('/github/start', async (c) => {
-  const { repos, token } = await c.req.json<{ repos: string[]; token?: string }>();
-  if (!Array.isArray(repos) || repos.length === 0) {
-    return c.json({ error: 'Missing repos array' }, 400);
+// Callback handler — session middleware is skipped for this path (see index.ts)
+importApi.get('/twitter/callback', async (c) => {
+  const error = c.req.query('error');
+  if (error) {
+    const desc = c.req.query('error_description') || error;
+    return c.redirect(`/import/twitter?error=${encodeURIComponent(desc)}`);
+  }
+
+  const code = c.req.query('code');
+  const state = c.req.query('state');
+  if (!code || !state) {
+    return c.redirect('/import/twitter?error=Missing+authorization+code');
   }
 
   try {
-    const jobId = await startImportJob(repos, token);
-    return c.json({ jobId });
+    await handleOAuthCallback(code, state);
+    return c.redirect('/import/twitter?connected=true');
   } catch (err: any) {
-    if (err.message.includes('already in progress')) {
-      return c.json({ error: err.message }, 409);
-    }
-    return c.json({ error: err.message }, 500);
+    console.error('Twitter OAuth callback error:', err);
+    return c.redirect(`/import/twitter?error=${encodeURIComponent(err.message)}`);
   }
 });
 
-// Check for any active import job (survives page refresh)
-importApi.get('/github/active', async (c) => {
-  const result = await query(
-    `SELECT * FROM jobs WHERE type = 'import' AND status = 'running' ORDER BY started_at DESC LIMIT 1`
-  );
+importApi.post('/twitter/credentials', async (c) => {
+  const { clientId, clientSecret } = await c.req.json<{ clientId: string; clientSecret: string }>();
+  if (!clientId || !clientSecret) return c.json({ error: 'Missing clientId or clientSecret' }, 400);
 
-  if (result.rows.length === 0) return c.json({ active: false });
-
-  const job = result.rows[0];
-  return c.json({
-    active: true,
-    jobId: job.id,
-    status: job.status,
-    completed: job.completed || 0,
-    total: job.total || 0,
-    skipped: job.skipped || 0,
-    failed: job.failed || 0,
-    currentRepo: job.current_item || '',
-    results: job.results || [],
-    startedAt: job.started_at,
-    completedAt: job.completed_at,
-  });
-});
-
-// Poll job status (simple HTTP -- works through any proxy)
-importApi.get('/github/:jobId/status', async (c) => {
-  const jobId = c.req.param('jobId');
-
-  const result = await query('SELECT * FROM jobs WHERE id = $1', [jobId]);
-  if (result.rows.length === 0) {
-    return c.json({ error: 'Job not found' }, 404);
-  }
-
-  const job = result.rows[0];
-  return c.json({
-    status: job.status,
-    completed: job.completed || 0,
-    total: job.total || 0,
-    skipped: job.skipped || 0,
-    failed: job.failed || 0,
-    currentRepo: job.current_item || '',
-    results: job.results || [],
-    startedAt: job.started_at,
-    completedAt: job.completed_at,
-    error: job.error,
-  });
-});
-
-importApi.post('/github/:jobId/cancel', async (c) => {
-  const jobId = c.req.param('jobId');
-
-  const result = await query('SELECT status FROM jobs WHERE id = $1', [jobId]);
-  if (result.rows.length === 0) return c.json({ error: 'Job not found' }, 404);
-
-  const { status } = result.rows[0];
-  if (status !== 'running') return c.json({ error: `Job is ${status}, not running` }, 400);
-
-  await query(`UPDATE jobs SET status = 'cancelled' WHERE id = $1 AND status = 'running'`, [jobId]);
-  return c.json({ success: true, message: 'Cancellation requested' });
-});
-
-// --- Reprocessing ---
-
-importApi.post('/reprocess/start', async (c) => {
   try {
-    const jobId = await startReprocessJob();
-    return c.json({ jobId });
+    await saveTwitterCredentials(clientId, clientSecret);
+    return c.json({ success: true });
   } catch (err: any) {
-    console.error('Reprocess start error:', err);
-    if (err.message?.includes('already in progress')) {
-      return c.json({ error: err.message }, 409);
-    }
-    return c.json({ error: err.message || 'Unknown error' }, 500);
+    return c.json({ error: err.message }, 400);
   }
 });
 
-importApi.get('/reprocess/active', async (c) => {
-  const result = await query(
-    `SELECT * FROM jobs WHERE type = 'reprocess' AND status = 'running' ORDER BY started_at DESC LIMIT 1`
-  );
-
-  if (result.rows.length === 0) return c.json({ active: false });
-
-  const job = result.rows[0];
-  return c.json({
-    active: true,
-    jobId: job.id,
-    status: job.status,
-    completed: job.completed || 0,
-    total: job.total || 0,
-    skipped: job.skipped || 0,
-    failed: job.failed || 0,
-    currentMemory: job.current_item || '',
-    startedAt: job.started_at,
-    completedAt: job.completed_at,
-    error: job.error,
-  });
+importApi.get('/twitter/status', async (c) => {
+  try {
+    const info = await getTwitterTokenInfo();
+    return c.json(info);
+  } catch (err: any) {
+    console.error('Twitter status error:', err);
+    return c.json({ hasCredentials: false, hasToken: false, error: err.message }, 200);
+  }
 });
 
-importApi.get('/reprocess/:jobId/status', async (c) => {
-  const jobId = c.req.param('jobId');
+importApi.get('/twitter/authorize', async (c) => {
+  try {
+    const proto = c.req.header('x-forwarded-proto') || 'http';
+    const host = c.req.header('host') || 'localhost:3001';
+    const callbackUrl = `${proto}://${host}/api/import/twitter/callback`;
 
-  const result = await query('SELECT * FROM jobs WHERE id = $1', [jobId]);
-  if (result.rows.length === 0) {
-    return c.json({ error: 'Job not found' }, 404);
+    const url = await generateAuthUrl(callbackUrl);
+    return c.json({ url });
+  } catch (err: any) {
+    return c.json({ error: err.message }, 400);
+  }
+});
+
+importApi.delete('/twitter/disconnect', async (c) => {
+  await removeTwitterConnection();
+  return c.json({ success: true });
+});
+
+// --- Twitter Bookmark Discovery ---
+
+importApi.get('/twitter/folders', async (c) => {
+  try {
+    const folders = await discoverBookmarkFolders();
+    return c.json({ folders });
+  } catch (err: any) {
+    return c.json({ error: `Failed to fetch folders: ${err.message}` }, 500);
+  }
+});
+
+importApi.post('/twitter/discover', async (c) => {
+  const { folderId } = await c.req.json<{ folderId?: string }>();
+
+  try {
+    const result = await discoverBookmarks(folderId);
+    return c.json(result);
+  } catch (err: any) {
+    return c.json({ error: `Discovery failed: ${err.message}` }, 500);
+  }
+});
+
+importApi.post('/twitter/upload', async (c) => {
+  const body = await c.req.parseBody();
+  const file = body['file'];
+
+  if (!file || !(file instanceof File)) {
+    return c.json({ error: 'Missing zip file' }, 400);
   }
 
-  const job = result.rows[0];
-  return c.json({
-    status: job.status,
-    completed: job.completed || 0,
-    total: job.total || 0,
-    skipped: job.skipped || 0,
-    failed: job.failed || 0,
-    currentMemory: job.current_item || '',
-    startedAt: job.started_at,
-    completedAt: job.completed_at,
-    error: job.error,
-  });
-});
-
-importApi.post('/reprocess/:jobId/cancel', async (c) => {
-  const jobId = c.req.param('jobId');
-
-  const result = await query('SELECT status FROM jobs WHERE id = $1', [jobId]);
-  if (result.rows.length === 0) return c.json({ error: 'Job not found' }, 404);
-
-  const { status } = result.rows[0];
-  if (status !== 'running') return c.json({ error: `Job is ${status}, not running` }, 400);
-
-  await query(`UPDATE jobs SET status = 'cancelled' WHERE id = $1 AND status = 'running'`, [jobId]);
-  return c.json({ success: true, message: 'Cancellation requested' });
+  try {
+    const arrayBuffer = await file.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+    const result = await parseBookmarksFromExport(buffer);
+    return c.json(result);
+  } catch (err: any) {
+    return c.json({ error: err.message }, 400);
+  }
 });
 
 export { importApi };

@@ -1,21 +1,22 @@
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
-import { api } from '../api';
+import { useLogout } from '../hooks/queries';
 
 const navItems = [
   { to: '/', label: 'Chat', end: true },
   { to: '/memories', label: 'Memories' },
-  { to: '/search', label: 'Search' },
-  { to: '/ingest', label: 'Ingest' },
   { to: '/import', label: 'Import' },
+  { to: '/jobs', label: 'Jobs' },
   { to: '/settings', label: 'Settings' },
 ];
 
 export function Layout() {
   const navigate = useNavigate();
+  const logout = useLogout();
 
-  const handleLogout = async () => {
-    await api.logout();
-    navigate('/login');
+  const handleLogout = () => {
+    logout.mutate(undefined, {
+      onSuccess: () => navigate('/login'),
+    });
   };
 
   return (

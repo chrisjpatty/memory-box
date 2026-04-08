@@ -36,7 +36,7 @@ memories.get('/', async (c) => {
     ? ` WHERE ${conditions.join(' AND ')}`
     : '';
 
-  const listQuery = `SELECT id, title, content_type, category, summary, created_at FROM memories${whereClause} ORDER BY created_at DESC LIMIT $${paramIndex++} OFFSET $${paramIndex++}`;
+  const listQuery = `SELECT id, title, content_type, category, summary, tags, source_url, metadata, file_key, created_at FROM memories${whereClause} ORDER BY created_at DESC LIMIT $${paramIndex++} OFFSET $${paramIndex++}`;
   params.push(limit, skip);
 
   const listResult = await query(listQuery, params);
@@ -47,7 +47,11 @@ memories.get('/', async (c) => {
     contentType: m.content_type,
     category: m.category || '',
     summary: m.summary || '',
+    tags: m.tags || [],
     createdAt: m.created_at,
+    source: m.source_url,
+    hasImage: m.file_key != null && !m.file_key.endsWith('/original.html'),
+    extra: m.metadata || {},
   }));
 
   // Count query uses same conditions but without LIMIT/OFFSET
@@ -80,7 +84,7 @@ memories.get('/:id', async (c) => {
       source: m.source_url,
       processedContent: m.processed_content,
       markdown: m.markdown,
-      hasImage: m.file_key != null,
+      hasImage: m.file_key != null && !m.file_key.endsWith('/original.html'),
       hasHtml: m.has_html,
       extra: m.metadata || {},
     },

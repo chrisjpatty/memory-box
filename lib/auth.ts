@@ -19,17 +19,14 @@ export function safeCompare(a: string, b: string): boolean {
   return timingSafeEqual(bufA, bufB);
 }
 
-export async function generateToken(): Promise<string> {
+export async function generateToken(name: string): Promise<string> {
   const token = nanoid(48);
   const hash = hashToken(token);
   const hint = token.slice(0, 8) + '...' + token.slice(-4);
 
-  // Deactivate any existing tokens
-  await query('UPDATE auth_tokens SET active = false WHERE active = true');
-
   await query(
-    'INSERT INTO auth_tokens (token_hash, hint, active) VALUES ($1, $2, true)',
-    [hash, hint],
+    'INSERT INTO auth_tokens (name, token_hash, hint, active) VALUES ($1, $2, $3, true)',
+    [name, hash, hint],
   );
   return token;
 }
@@ -43,16 +40,24 @@ export async function validateToken(token: string): Promise<boolean> {
   return result.rows.length > 0;
 }
 
-export async function hasActiveToken(): Promise<boolean> {
-  const result = await query('SELECT id FROM auth_tokens WHERE active = true LIMIT 1');
-  return result.rows.length > 0;
+export interface TokenInfo {
+  id: number;
+  name: string;
+  hint: string;
+  created_at: string;
 }
 
-export async function getTokenHint(): Promise<string | null> {
-  const result = await query('SELECT hint FROM auth_tokens WHERE active = true LIMIT 1');
-  return result.rows[0]?.hint || null;
+export async function listTokens(): Promise<TokenInfo[]> {
+  const result = await query(
+    'SELECT id, name, hint, created_at FROM auth_tokens WHERE active = true ORDER BY created_at DESC',
+  );
+  return result.rows;
 }
 
-export async function revokeCurrentToken(): Promise<void> {
-  await query('UPDATE auth_tokens SET active = false WHERE active = true');
+export async function revokeToken(id: number): Promise<boolean> {
+  const result = await query(
+    'UPDATE auth_tokens SET active = false WHERE id = $1 AND active = true',
+    [id],
+  );
+  return result.rowCount > 0;
 }

@@ -1,17 +1,10 @@
-import { useEffect, useState } from 'react';
 import { Outlet, Navigate } from 'react-router-dom';
-import { api } from '../api';
+import { useAuthStatus } from '../hooks/queries';
 
 export function ProtectedRoute() {
-  const [status, setStatus] = useState<'loading' | 'ok' | 'unauthorized'>('loading');
+  const { data, isLoading, isError } = useAuthStatus();
 
-  useEffect(() => {
-    api.authStatus()
-      .then((r) => setStatus(r.authenticated ? 'ok' : 'unauthorized'))
-      .catch(() => setStatus('unauthorized'));
-  }, []);
-
-  if (status === 'loading') return null;
-  if (status === 'unauthorized') return <Navigate to="/login" replace />;
+  if (isLoading) return null;
+  if (isError || !data?.authenticated) return <Navigate to="/login" replace />;
   return <Outlet />;
 }

@@ -97,6 +97,9 @@ export function TweetCard({ memory, onDelete }: MemoryCardProps) {
 
   return (
     <CardShell id={memory.id} onDelete={onDelete}>
+      {/* Subtle background glow */}
+      <div className="absolute inset-0 rounded-xl pointer-events-none bg-gradient-to-br from-blue-500/[0.04] to-transparent" />
+
       <div className="p-4">
         {/* Author row */}
         <div className="flex items-start gap-2.5">
@@ -145,7 +148,7 @@ export function TweetCard({ memory, onDelete }: MemoryCardProps) {
             <div className="flex items-center gap-5">
               {/* Replies */}
               <div className="flex items-center gap-1.5 text-neutral-600 group/stat">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="group-hover/stat:text-sky-400 transition-colors">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="group-hover/stat:text-blue-400 transition-colors">
                   <path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
                 {replies && <span className="text-[11px]">{replies}</span>}
@@ -172,7 +175,7 @@ export function TweetCard({ memory, onDelete }: MemoryCardProps) {
 
               {/* Views */}
               <div className="flex items-center gap-1.5 text-neutral-600 group/stat">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="group-hover/stat:text-sky-400 transition-colors">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="group-hover/stat:text-blue-400 transition-colors">
                   <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z" />
                   <circle cx="12" cy="12" r="3" />
                 </svg>
@@ -188,7 +191,7 @@ export function TweetCard({ memory, onDelete }: MemoryCardProps) {
             {memory.tags.slice(0, 3).map((tag) => (
               <span
                 key={tag}
-                className="px-1.5 py-0.5 rounded bg-sky-500/[0.06] text-[9px] text-sky-400/50 border border-sky-500/10"
+                className="px-1.5 py-0.5 rounded bg-blue-500/[0.06] text-[9px] text-blue-400/50 border border-blue-500/10"
               >
                 {tag}
               </span>
