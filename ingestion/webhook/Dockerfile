@@ -8,14 +8,15 @@ COPY package.json ./
 COPY dashboard/package.json ./dashboard/
 RUN bun install
 
-# Build React dashboard
+# Build React dashboard (+ extract card CSS for MCP Apps)
 COPY dashboard ./dashboard
+COPY scripts ./scripts
+COPY mcp ./mcp
 RUN cd dashboard && bun install && bun run build
 
-# Copy backend source
+# Copy backend source (mcp/ already copied above for CSS extraction)
 COPY ingestion/webhook ./ingestion/webhook
 COPY lib ./lib
-COPY mcp ./mcp
 COPY tools ./tools
 
 # Runtime stage
