@@ -1,7 +1,8 @@
 # yaml-language-server: $schema=https://astropods.ai/schema/package.json
 spec: package/v1
 name: memory-box
-
+meta:
+  visibility: private
 agent:
   build:
     context: .
