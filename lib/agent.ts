@@ -7,6 +7,8 @@ import { Agent } from '@mastra/core/agent';
 import { Mastra } from '@mastra/core/mastra';
 import { Memory } from '@mastra/memory';
 import { PostgresStore } from '@mastra/pg';
+import { Observability } from '@mastra/observability';
+import { OtelExporter } from '@mastra/otel-exporter';
 
 import { storeMemory } from '../tools/store-memory';
 import { searchMemories } from '../tools/search-memories';
@@ -68,6 +70,19 @@ NEVER write out memory details as markdown. Always use display-memories instead.
 - If a search returns no results, suggest alternative queries or let them know the memory box is empty
 - If content was deduplicated on ingest, let the user know it was already stored`;
 
+function resolveOtlpTracesEndpoint(): string {
+  const raw = process.env.OTEL_EXPORTER_OTLP_ENDPOINT || 'http://localhost:4318';
+  try {
+    const url = new URL(raw);
+    if (!url.pathname || url.pathname === '/') {
+      url.pathname = '/v1/traces';
+    }
+    return url.toString();
+  } catch {
+    return `${raw.replace(/\/+$/, '')}/v1/traces`;
+  }
+}
+
 let _mastra: Mastra | null = null;
 
 export function createMastra(): Mastra {
@@ -105,10 +120,29 @@ export function createMastra(): Mastra {
     },
   });
 
+  const observability = new Observability({
+    configs: {
+      otel: {
+        serviceName: 'memory-box',
+        exporters: [
+          new OtelExporter({
+            provider: {
+              custom: {
+                endpoint: resolveOtlpTracesEndpoint(),
+                protocol: 'http/protobuf',
+              },
+            },
+          }),
+        ],
+      },
+    },
+  });
+
   _mastra = new Mastra({
     agents: {
       [AGENT_ID]: agent,
     },
+    observability,
   });
 
   return _mastra;

@@ -7,6 +7,25 @@ agent:
   build:
     context: .
     dockerfile: Dockerfile
+  interfaces:
+    frontend: true
+    messaging: false
+  inputs:
+    - name: POSTGRES_HOST
+      datatype: string
+      default: knowledge-db
+    - name: POSTGRES_USER
+      datatype: string
+      default: postgres
+    - name: POSTGRES_PASSWORD
+      datatype: string
+      default: postgres
+    - name: POSTGRES_DB
+      datatype: string
+      default: memory_box
+    - name: MINIO_HOST
+      datatype: string
+      default: knowledge-files
 models:
   ollama:
     provider: ollama
@@ -40,16 +59,7 @@ knowledge:
       volume: /data
     persistent: true
 
-ingestion:
-  webhook:
-    container:
-      build:
-        context: .
-        dockerfile: ingestion/webhook/Dockerfile
-    trigger:
-      type: webhook
-
 dev:
   interfaces:
-    messaging:
-      adapters: [web]
+    frontend:
+      port: 3001

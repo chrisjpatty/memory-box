@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { hybridSearch } from '../../../lib/search';
+import { hybridSearch } from '../../lib/search';
 
 const search = new Hono();
 

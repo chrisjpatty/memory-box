@@ -8,16 +8,15 @@ let bucketReady = false;
 function getClient(): S3Client {
   if (!client) {
     const host = process.env.MINIO_HOST || process.env.FILES_HOST || 'localhost';
-    const port = process.env.MINIO_PORT || process.env.FILES_PORT || '9000';
-    const endpoint = process.env.MINIO_URL || `http://${host}:${port}`;
+    const endpoint = `http://${host}:9000`;
 
     client = new S3Client({
       endpoint,
       region: 'us-east-1',
       forcePathStyle: true,
       credentials: {
-        accessKeyId: process.env.MINIO_ROOT_USER || 'minioadmin',
-        secretAccessKey: process.env.MINIO_ROOT_PASSWORD || 'minioadmin',
+        accessKeyId: 'minioadmin',
+        secretAccessKey: 'minioadmin',
       },
     });
   }

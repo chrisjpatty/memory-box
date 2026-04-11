@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { query } from '../../../lib/db';
+import { query } from '../../lib/db';
 
 const stats = new Hono();
 

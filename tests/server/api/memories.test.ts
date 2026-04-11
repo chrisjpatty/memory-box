@@ -1,23 +1,23 @@
 import { describe, expect, test, beforeEach, mock } from 'bun:test';
-import { createMockPool, createMockStorage } from '../../../helpers/mock-clients';
+import { createMockPool, createMockStorage } from '../../helpers/mock-clients';
 
 const mockPool = createMockPool();
 const mockStorage = createMockStorage();
 
-mock.module('../../../../lib/db', () => ({
+mock.module('../../../lib/db', () => ({
   getPool: () => mockPool.instance,
   query: mockPool.instance.query,
   getClient: mockPool.instance.connect,
 }));
 
-mock.module('../../../../lib/storage', () => ({
+mock.module('../../../lib/storage', () => ({
   putFile: mockStorage.putFile,
   getFile: mockStorage.getFile,
   deleteFile: mockStorage.deleteFile,
   fileKey: mockStorage.fileKey,
 }));
 
-const { memories } = await import('../../../../ingestion/webhook/api/memories');
+const { memories } = await import('../../../server/api/memories');
 
 const sampleMemory = {
   id: 'test-mem-1',

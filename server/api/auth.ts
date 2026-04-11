@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
-import { hashPassword, verifyPassword, getPasswordHash, setPasswordHash } from '../../../lib/auth';
-import { createSession, validateSession, destroySession } from '../dashboard/session';
+import { hashPassword, verifyPassword, getPasswordHash, setPasswordHash } from '../../lib/auth';
+import { createSession, validateSession, destroySession } from '../session';
 
 const auth = new Hono();
 

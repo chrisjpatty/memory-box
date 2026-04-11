@@ -1,23 +1,23 @@
 import { Hono } from 'hono';
-import { saveGitHubToken, getGitHubToken, removeGitHubToken, getTokenInfo } from '../../../lib/import/token-store';
+import { saveGitHubToken, getGitHubToken, removeGitHubToken, getTokenInfo } from '../../lib/import/token-store';
 import {
   discoverStars,
   enableAutoSync,
   disableAutoSync,
   getSyncStatus,
-} from '../../../lib/import/github-stars';
+} from '../../lib/import/github-stars';
 import {
   saveTwitterCredentials,
   getTwitterTokenInfo,
   generateAuthUrl,
   handleOAuthCallback,
   removeTwitterConnection,
-} from '../../../lib/import/twitter-token-store';
+} from '../../lib/import/twitter-token-store';
 import {
   discoverBookmarks,
   discoverBookmarkFolders,
   parseBookmarksFromExport,
-} from '../../../lib/import/twitter-bookmarks';
+} from '../../lib/import/twitter-bookmarks';
 
 const importApi = new Hono();
 

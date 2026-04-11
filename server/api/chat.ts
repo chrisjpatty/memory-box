@@ -2,8 +2,8 @@ import { Hono } from 'hono';
 import { nanoid } from 'nanoid';
 import { handleChatStream } from '@mastra/ai-sdk';
 import { createUIMessageStreamResponse } from 'ai';
-import { createMastra, AGENT_ID } from '../../../lib/agent';
-import { query } from '../../../lib/db';
+import { createMastra, AGENT_ID } from '../../lib/agent';
+import { query } from '../../lib/db';
 
 export const chat = new Hono();
 

@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
-import { query } from '../../../lib/db';
-import { deleteMemory } from '../../../lib/pipeline/store';
-import { getFile } from '../../../lib/storage';
+import { query } from '../../lib/db';
+import { deleteMemory } from '../../lib/pipeline/store';
+import { getFile } from '../../lib/storage';
 
 const memories = new Hono();
 

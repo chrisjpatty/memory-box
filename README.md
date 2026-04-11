@@ -16,8 +16,7 @@ ast configure
 ast dev
 ```
 
-- **Agent playground**: http://localhost:3000
-- **Admin dashboard**: http://localhost:3001
+- **Admin dashboard**: http://localhost:3200
 
 ## How It Works
 
@@ -34,17 +33,17 @@ ast dev
 
 ```
 memory-box/
-├── agent/index.ts                # Chat agent (Claude Opus) with memory tools
+├── server/
+│   ├── index.ts                  # Production entry point (port 80)
+│   ├── app.ts                    # Hono app factory (API + ingestion + MCP + SPA)
+│   ├── api/                      # JSON API routes (auth, token, stats, memories, search, etc.)
+│   └── session.ts                # Session management
 ├── dashboard/                    # React + Vite + Tailwind admin dashboard
 │   └── src/
 │       ├── pages/                # Login, Dashboard, Memories, Search
 │       └── components/           # TokenCard, MemoryList, CodeSnippet, etc.
-├── ingestion/webhook/
-│   ├── index.ts                  # Hono HTTP server (API + ingestion endpoint)
-│   ├── api/                      # JSON API routes (auth, token, stats, memories, search)
-│   ├── dashboard/session.ts      # Session management
-│   └── Dockerfile
 ├── lib/
+│   ├── agent.ts                  # Mastra agent setup (Claude Opus) with memory tools
 │   ├── classifier.ts             # Haiku content classifier agent
 │   ├── ingest.ts                 # Ingestion orchestrator
 │   ├── pipelines/                # text.ts, url.ts, image.ts
@@ -53,7 +52,7 @@ memory-box/
 │   └── auth.ts                   # Bearer token management
 ├── tools/                        # Agent tools (store, search, get, list, delete)
 ├── astropods.yml                 # Astropods spec
-└── Dockerfile                    # Agent container
+└── Dockerfile                    # Single container (frontend: true)
 ```
 
 ## Dashboard Development

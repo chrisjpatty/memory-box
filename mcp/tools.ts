@@ -242,7 +242,7 @@ export function registerAllTools(server: McpServer): void {
       },
     },
     async (args: { message: string; threadId?: string }) => {
-      // Lazy-import to avoid circular dependency with agent/index.ts
+      // Lazy-import to avoid circular dependency
       const { Agent } = await import('@mastra/core/agent');
       const { Mastra } = await import('@mastra/core/mastra');
 

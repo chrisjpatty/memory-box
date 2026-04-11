@@ -1,11 +1,11 @@
 import { describe, expect, test, beforeEach, mock } from 'bun:test';
 import { Hono } from 'hono';
-import { createMockPool } from '../../../helpers/mock-clients';
+import { createMockPool } from '../../helpers/mock-clients';
 
 const mockPool = createMockPool();
 
 // Mock db FIRST before any module that imports it
-mock.module('../../../../lib/db', () => ({
+mock.module('../../../lib/db', () => ({
   getPool: () => mockPool.instance,
   query: mockPool.instance.query,
   getClient: mockPool.instance.connect,
@@ -22,7 +22,7 @@ function splitOversizedChunks(texts: string[], maxChars = 4000): string[] {
   return result;
 }
 
-mock.module('../../../../lib/pipeline/embed', () => ({
+mock.module('../../../lib/pipeline/embed', () => ({
   getEmbeddingProvider: () => ({
     embed: async (texts: string[]) => texts.map(() => new Array(768).fill(0)),
     embedOne: async () => new Array(768).fill(0),
@@ -32,7 +32,7 @@ mock.module('../../../../lib/pipeline/embed', () => ({
   splitOversizedChunks,
 }));
 
-mock.module('../../../../lib/pipeline/classify', () => ({
+mock.module('../../../lib/pipeline/classify', () => ({
   classifyContent: async (content: string, title?: string, tags?: string[]) => ({
     mode: 'single' as const,
     classification: {
@@ -54,15 +54,15 @@ mock.module('../../../../lib/pipeline/classify', () => ({
   }),
 }));
 
-mock.module('../../../../lib/storage', () => ({
+mock.module('../../../lib/storage', () => ({
   putFile: async () => {},
   getFile: async () => null,
   deleteFile: async () => {},
   fileKey: (id: string, name: string) => `${id}/${name}`,
 }));
 
-const { validateToken } = await import('../../../../lib/auth');
-const { ingest } = await import('../../../../lib/ingest');
+const { validateToken } = await import('../../../lib/auth');
+const { ingest } = await import('../../../lib/ingest');
 
 const app = new Hono();
 
@@ -110,7 +110,7 @@ app.post('/ingest/batch', bearerAuth, async (c) => {
 });
 
 async function setupToken(): Promise<string> {
-  const { generateToken } = await import('../../../../lib/auth');
+  const { generateToken } = await import('../../../lib/auth');
   return generateToken();
 }
 

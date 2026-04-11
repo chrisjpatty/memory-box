@@ -1,15 +1,15 @@
 import { describe, expect, test, beforeEach, mock } from 'bun:test';
-import { createMockPool } from '../../../helpers/mock-clients';
+import { createMockPool } from '../../helpers/mock-clients';
 
 const mockPool = createMockPool();
 
-mock.module('../../../../lib/db', () => ({
+mock.module('../../../lib/db', () => ({
   getPool: () => mockPool.instance,
   query: mockPool.instance.query,
   getClient: mockPool.instance.connect,
 }));
 
-const { token } = await import('../../../../ingestion/webhook/api/token');
+const { token } = await import('../../../server/api/token');
 
 describe('token routes', () => {
   beforeEach(() => {

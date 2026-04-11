@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { ingest as runIngest } from '../../../lib/ingest';
+import { ingest as runIngest } from '../../lib/ingest';
 
 const ingestApi = new Hono();
 

@@ -1,16 +1,16 @@
 import { describe, expect, test, mock } from 'bun:test';
-import { splitOversizedChunks } from '../../../../lib/pipeline/embed';
-import { createMockPool } from '../../../helpers/mock-clients';
+import { splitOversizedChunks } from '../../../lib/pipeline/embed';
+import { createMockPool } from '../../helpers/mock-clients';
 
 const mockPool = createMockPool();
 
-mock.module('../../../../lib/db', () => ({
+mock.module('../../../lib/db', () => ({
   getPool: () => mockPool.instance,
   query: mockPool.instance.query,
   getClient: mockPool.instance.connect,
 }));
 
-mock.module('../../../../lib/pipeline/embed', () => ({
+mock.module('../../../lib/pipeline/embed', () => ({
   getEmbeddingProvider: () => ({
     embed: async (texts: string[]) => texts.map(() => new Array(768).fill(0)),
     embedOne: async () => new Array(768).fill(0),
@@ -20,7 +20,7 @@ mock.module('../../../../lib/pipeline/embed', () => ({
   splitOversizedChunks,
 }));
 
-const { search } = await import('../../../../ingestion/webhook/api/search');
+const { search } = await import('../../../server/api/search');
 
 describe('search routes', () => {
   test('POST / with query → returns results array', async () => {

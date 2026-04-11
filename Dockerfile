@@ -8,8 +8,9 @@ COPY package.json ./
 COPY dashboard/package.json ./dashboard/
 RUN bun install
 
-# Copy source
+# Copy source and build dashboard
 COPY . .
+RUN cd dashboard && bun install && bun run build
 
 # Runtime stage
 FROM oven/bun:1-slim
@@ -18,10 +19,11 @@ WORKDIR /app
 
 # Copy from builder
 COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/agent ./agent
-COPY --from=builder /app/tools ./tools
+COPY --from=builder /app/server ./server
 COPY --from=builder /app/lib ./lib
+COPY --from=builder /app/tools ./tools
 COPY --from=builder /app/mcp ./mcp
+COPY --from=builder /app/dashboard/dist ./dashboard/dist
 COPY --from=builder /app/dashboard/src/components/MemoryCard ./dashboard/src/components/MemoryCard
 COPY --from=builder /app/package.json ./
 
@@ -29,5 +31,6 @@ COPY --from=builder /app/package.json ./
 RUN chown -R bun:bun /app
 USER bun
 
-# Run the agent
-CMD ["bun", "run", "agent/index.ts"]
+EXPOSE 80
+
+CMD ["bun", "run", "server/index.ts"]

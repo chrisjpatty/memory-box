@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { nanoid } from 'nanoid';
-import { query } from '../../../lib/db';
-import { createMastra, AGENT_ID } from '../../../lib/agent';
+import { query } from '../../lib/db';
+import { createMastra, AGENT_ID } from '../../lib/agent';
 
 export const conversations = new Hono();
 

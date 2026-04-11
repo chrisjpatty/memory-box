@@ -1,6 +1,6 @@
 import { nanoid } from 'nanoid';
 import type { Context } from 'hono';
-import { query } from '../../../lib/db';
+import { query } from '../lib/db';
 
 const SESSION_TTL = 86400; // 24 hours in seconds
 const COOKIE_NAME = 'mb_session';

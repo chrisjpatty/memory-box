@@ -6,8 +6,8 @@
  */
 
 import { Hono } from 'hono';
-import { query } from '../../../lib/db';
-import { generateToken, revokeToken } from '../../../lib/auth';
+import { query } from '../../lib/db';
+import { generateToken, revokeToken } from '../../lib/auth';
 
 const mcpSettings = new Hono();
 

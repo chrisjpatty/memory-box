@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { generateToken, listTokens, revokeToken } from '../../../lib/auth';
+import { generateToken, listTokens, revokeToken } from '../../lib/auth';
 
 const token = new Hono();
 

@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
-import { createJob, cancelJob, getJob, getActiveJob, listJobs } from '../../../lib/jobs/runner';
-import { getRegisteredTypes } from '../../../lib/jobs/registry';
-import type { JobStatus } from '../../../lib/jobs/types';
+import { createJob, cancelJob, getJob, getActiveJob, listJobs } from '../../lib/jobs/runner';
+import { getRegisteredTypes } from '../../lib/jobs/registry';
+import type { JobStatus } from '../../lib/jobs/types';
 
 const jobsApi = new Hono();
 
