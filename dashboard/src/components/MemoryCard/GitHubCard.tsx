@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { CardShell } from './CardShell';
 import type { MemoryCardProps } from './types';
 import { formatDate, formatCount } from './types';
@@ -62,6 +63,7 @@ function GitHubRepoCard({ memory, onDelete }: MemoryCardProps) {
   const extra = memory.extra || {};
   const language = extra.language;
   const langDot = langColors[language] || 'bg-neutral-500';
+  const [imgFailed, setImgFailed] = useState(false);
 
   return (
     <CardShell id={memory.id} onDelete={onDelete}>
@@ -69,12 +71,13 @@ function GitHubRepoCard({ memory, onDelete }: MemoryCardProps) {
       <div className="absolute inset-0 rounded-xl pointer-events-none bg-gradient-to-br from-emerald-500/[0.04] to-transparent z-10" />
 
       {/* README hero image */}
-      {extra.readmeImage && (
+      {extra.readmeImage && !imgFailed && (
         <div className="relative aspect-[2.4/1] bg-neutral-800 overflow-hidden">
           <img
             src={extra.readmeImage}
             alt=""
             className="w-full h-full object-cover"
+            onError={() => setImgFailed(true)}
           />
           <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-neutral-900 via-neutral-900/60 to-transparent" />
         </div>

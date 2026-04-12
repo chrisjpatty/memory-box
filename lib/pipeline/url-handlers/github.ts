@@ -85,11 +85,15 @@ export function parseGitHubUrl(url: URL): {
   return { owner, repo, type: 'other' };
 }
 
-/** Extract the first non-badge image URL from markdown content. */
+/** Extract the best non-badge image URL from markdown content.
+ *  Prefers hero-like images (screenshots, headers, banners), then normal
+ *  images, then falls back to icons/favicons if nothing else is available.
+ */
 function extractReadmeImage(markdown: string): string | null {
-  const imageRegex = /!\[[^\]]*\]\(([^)]+)\)/g;
+  // Collect image URLs from both markdown ![alt](url) and HTML <img src="url">
+  const mdImageRegex = /!\[[^\]]*\]\(([^)]+)\)/g;
+  const htmlImageRegex = /<img\s[^>]*?src=["']([^"']+)["'][^>]*?\/?>/gi;
 
-  // Patterns that indicate a badge or status icon rather than a real image
   const badgePatterns = [
     /shields\.io/i,
     /badgen\.net/i,
@@ -111,14 +115,47 @@ function extractReadmeImage(markdown: string): string | null {
     /crates\.io/i,
   ];
 
+  // Hero-like filenames — these make the best card images
+  const heroPatterns = [
+    /screenshot/i,
+    /header/i,
+    /banner/i,
+    /demo/i,
+    /preview/i,
+    /hero/i,
+    /cover/i,
+    /example/i,
+  ];
+
+  // Low-quality card images — only use as a last resort
+  const iconPatterns = [
+    /favicon/i,
+    /icon[\W_-]/i,
+    /\bicons?\b/i,
+  ];
+
+  const candidates: string[] = [];
+
   let match;
-  while ((match = imageRegex.exec(markdown)) !== null) {
+  while ((match = mdImageRegex.exec(markdown)) !== null) {
     const url = match[1].trim();
-    const isBadge = badgePatterns.some((p) => p.test(url));
-    if (!isBadge) return url;
+    if (!badgePatterns.some((p) => p.test(url))) candidates.push(url);
+  }
+  while ((match = htmlImageRegex.exec(markdown)) !== null) {
+    const url = match[1].trim();
+    if (!badgePatterns.some((p) => p.test(url))) candidates.push(url);
   }
 
-  return null;
+  if (candidates.length === 0) return null;
+
+  // Prefer hero images, then normal, then icons/favicons
+  const hero = candidates.find((u) => heroPatterns.some((p) => p.test(u)));
+  if (hero) return hero;
+
+  const normal = candidates.find((u) => !iconPatterns.some((p) => p.test(u)));
+  if (normal) return normal;
+
+  return candidates[0];
 }
 
 // --- Handlers for different GitHub URL types ---
