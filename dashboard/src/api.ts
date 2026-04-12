@@ -99,6 +99,19 @@ export const api = {
   mcpDisable: () =>
     request<{ success: boolean }>('/api/mcp/disable', { method: 'POST' }),
 
+  // OAuth consent
+  oauthClientInfo: (clientId: string) =>
+    request<{ client_name: string; redirect_uris: string[] }>(`/api/oauth/client/${clientId}`),
+  oauthConsent: (params: {
+    client_id: string;
+    redirect_uri: string;
+    code_challenge: string;
+    state: string;
+    scope: string;
+    approved: boolean;
+  }) =>
+    request<{ redirect_url: string }>('/api/oauth/consent', { method: 'POST', body: JSON.stringify(params) }),
+
   // Conversations
   listConversations: () =>
     request<{ conversations: { id: string; title: string; created_at: string; updated_at: string }[] }>('/api/conversations'),

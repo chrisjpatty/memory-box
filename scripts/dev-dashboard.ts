@@ -19,6 +19,7 @@ import { homedir } from 'os';
 import { createApp } from '../server/app';
 import { initDatabase } from '../lib/db-init';
 import { initJobSystem } from '../lib/jobs/init';
+import { startCleanupJob } from '../lib/oauth';
 
 // Load secrets from ast project config
 try {
@@ -47,6 +48,7 @@ const app = createApp({
 
 await initDatabase();
 initJobSystem();
+startCleanupJob();
 
 const port = parseInt(process.env.PORT || '3002', 10);
 console.log(`\n  Dashboard API server: http://localhost:${port}`);

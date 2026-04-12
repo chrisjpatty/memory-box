@@ -14,11 +14,13 @@ import { General } from './pages/settings/General';
 import { Tokens } from './pages/settings/Tokens';
 import { DangerZone } from './pages/settings/DangerZone';
 import { McpServer } from './pages/settings/McpServer';
+import { OAuthConsent } from './pages/OAuthConsent';
 
 export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
+      <Route path="/oauth/consent" element={<OAuthConsent />} />
       <Route element={<ProtectedRoute />}>
         <Route element={<Layout />}>
           <Route index element={<Chat />} />

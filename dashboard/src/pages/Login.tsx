@@ -1,9 +1,10 @@
 import { useState, type FormEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuthStatus, useLogin, useSetup } from '../hooks/queries';
 
 export function Login() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { data: authStatus, isLoading } = useAuthStatus();
   const login = useLogin();
   const setup = useSetup();
@@ -31,7 +32,12 @@ export function Login() {
     }
 
     mutation.mutate(password, {
-      onSuccess: () => navigate('/', { replace: true }),
+      onSuccess: () => {
+        const redirect = searchParams.get('redirect');
+        // Only allow relative paths to prevent open redirect
+        const target = redirect && redirect.startsWith('/') ? redirect : '/';
+        navigate(target, { replace: true });
+      },
     });
   };
 

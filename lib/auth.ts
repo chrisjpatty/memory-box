@@ -6,7 +6,7 @@ import { createHash, randomBytes, timingSafeEqual } from 'crypto';
 import { nanoid } from 'nanoid';
 import { query } from './db';
 
-function hashToken(token: string): string {
+export function hashToken(token: string): string {
   return createHash('sha256').update(token).digest('hex');
 }
 

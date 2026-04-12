@@ -141,3 +141,38 @@ CREATE TABLE IF NOT EXISTS settings (
   value      TEXT NOT NULL,
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- OAuth 2.1 Dynamic Client Registration (RFC 7591)
+CREATE TABLE IF NOT EXISTS oauth_clients (
+  id              TEXT PRIMARY KEY,
+  client_name     TEXT NOT NULL,
+  redirect_uris   JSONB NOT NULL DEFAULT '[]',
+  grant_types     JSONB NOT NULL DEFAULT '["authorization_code"]',
+  response_types  JSONB NOT NULL DEFAULT '["code"]',
+  token_endpoint_auth_method TEXT NOT NULL DEFAULT 'none',
+  created_at      TIMESTAMPTZ DEFAULT NOW(),
+  created_by_ip   TEXT
+);
+
+-- OAuth authorization codes (short-lived, PKCE-protected)
+CREATE TABLE IF NOT EXISTS oauth_auth_codes (
+  code_hash        TEXT PRIMARY KEY,
+  client_id        TEXT NOT NULL REFERENCES oauth_clients(id) ON DELETE CASCADE,
+  redirect_uri     TEXT NOT NULL,
+  code_challenge   TEXT NOT NULL,
+  scope            TEXT NOT NULL DEFAULT '',
+  expires_at       TIMESTAMPTZ NOT NULL,
+  used             BOOLEAN DEFAULT FALSE,
+  created_at       TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- OAuth refresh tokens
+CREATE TABLE IF NOT EXISTS oauth_refresh_tokens (
+  token_hash       TEXT PRIMARY KEY,
+  client_id        TEXT NOT NULL REFERENCES oauth_clients(id) ON DELETE CASCADE,
+  auth_token_id    INTEGER NOT NULL REFERENCES auth_tokens(id) ON DELETE CASCADE,
+  scope            TEXT NOT NULL DEFAULT '',
+  expires_at       TIMESTAMPTZ NOT NULL,
+  revoked          BOOLEAN DEFAULT FALSE,
+  created_at       TIMESTAMPTZ DEFAULT NOW()
+);

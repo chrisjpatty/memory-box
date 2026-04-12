@@ -15,6 +15,8 @@ import { conversations } from './api/conversations';
 import { jobsApi } from './api/jobs';
 import { createMcpHandler } from '../mcp/server';
 import { mcpSettings } from './api/mcp-settings';
+import { oauthWellKnown, oauthRoutes } from './api/oauth';
+import { oauthConsentApi } from './api/oauth-consent';
 import { serveStatic } from 'hono/bun';
 import type { IngestRequest } from '../lib/types';
 
@@ -34,6 +36,10 @@ export function createApp(options?: AppOptions) {
 
   // Health check
   app.get('/health', (c) => c.json({ status: 'ok' }));
+
+  // --- OAuth 2.1 routes (no session auth) ---
+  app.route('/', oauthWellKnown);        // /.well-known/* metadata endpoints
+  app.route('/oauth', oauthRoutes);       // /oauth/register, /oauth/authorize, /oauth/token
 
   // --- Dashboard API routes ---
 
@@ -60,18 +66,21 @@ export function createApp(options?: AppOptions) {
   app.route('/api/conversations', conversations);
   app.route('/api/chat', chat);
   app.route('/api/mcp', mcpSettings);
+  app.route('/api/oauth', oauthConsentApi);
 
   // --- Ingestion routes (bearer token auth) ---
 
   const bearerAuth = async (c: any, next: any) => {
     const authHeader = c.req.header('Authorization');
+    const resourceMetadataUrl = `${new URL(c.req.url).origin}/.well-known/oauth-protected-resource`;
+    const wwwAuth = { 'WWW-Authenticate': `Bearer resource_metadata="${resourceMetadataUrl}"` };
     if (!authHeader?.startsWith('Bearer ')) {
-      return c.json({ error: 'Missing or invalid Authorization header' }, 401);
+      return c.json({ error: 'Missing or invalid Authorization header' }, 401, wwwAuth);
     }
     const bearerToken = authHeader.slice(7);
     const valid = await validateToken(bearerToken);
     if (!valid) {
-      return c.json({ error: 'Invalid token' }, 401);
+      return c.json({ error: 'Invalid token' }, 401, wwwAuth);
     }
     await next();
   };
