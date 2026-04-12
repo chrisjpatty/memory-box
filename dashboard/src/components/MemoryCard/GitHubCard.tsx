@@ -83,7 +83,7 @@ function GitHubRepoCard({ memory, onDelete }: MemoryCardProps) {
         </div>
       )}
 
-      <div className={extra.readmeImage ? 'px-4 pb-4 -mt-3 relative' : 'p-4'}>
+      <div className={extra.readmeImage && !imgFailed ? 'px-4 pb-4 -mt-3 relative' : 'p-4'}>
         {/* Repo identity */}
         <div className="flex items-center gap-2.5 mb-2.5">
           <GitHubLogo />
