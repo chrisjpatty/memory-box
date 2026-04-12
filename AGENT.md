@@ -17,9 +17,11 @@ integrations:
   - "ollama"
 ---
 
-<div style="text-align: center;">
+<div align="center">
   <img src="https://i.ibb.co/3mWMZKJG/logo.png" alt="Memory Box" border="0" width="200">
 </div>
+
+<h2 align="center">memory-box</h2>
 
 Save anything — articles, notes, images, tweets, GitHub repos — and find it again through natural language. MemoryBox remembers what you save and understands what you're looking for.
 

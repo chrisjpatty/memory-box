@@ -36,14 +36,9 @@ try {
   }
 } catch { /* config not found, rely on manual env */ }
 
-// Default env — assumes ast dev is running and exposing services on localhost.
-// Hard-set connection vars so stale ast configure values don't override them.
-process.env.POSTGRES_HOST = process.env.POSTGRES_HOST ?? 'localhost';
-process.env.POSTGRES_PORT = process.env.POSTGRES_PORT ?? '5432';
-process.env.POSTGRES_DB = process.env.POSTGRES_DB ?? 'memory_box';
-process.env.POSTGRES_USER = process.env.POSTGRES_USER ?? 'postgres';
-process.env.POSTGRES_PASSWORD = process.env.POSTGRES_PASSWORD ?? 'postgres';
-process.env.MINIO_HOST = 'localhost';
+// Host defaults — assumes ast dev is running and exposing services on localhost.
+process.env.POSTGRES_HOST ??= 'localhost';
+process.env.MINIO_HOST ??= 'localhost';
 
 const app = createApp({
   corsOrigins: ['http://localhost:5173', 'http://localhost:5174'],

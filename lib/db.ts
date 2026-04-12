@@ -5,19 +5,16 @@ let pool: pg.Pool | null = null;
 let typesRegistered = false;
 
 function resolveConnectionConfig(): pg.PoolConfig {
-  // Check for explicit connection string first
-  if (process.env.DATABASE_URL || process.env.DB_URL) {
-    return { connectionString: (process.env.DATABASE_URL || process.env.DB_URL)!, max: 10 };
-  }
-  // Astropods custom knowledge containers are accessible by service name on the Docker network.
-  // The "db" entry in astropods.yml becomes "knowledge-db" as the Docker service name.
-  // Astropods injects POSTGRES_HOST/POSTGRES_PORT for the postgres provider.
-  const host = process.env.POSTGRES_HOST || process.env.DB_HOST || '127.0.0.1';
-  const port = parseInt(process.env.DB_PORT || process.env.POSTGRES_PORT || '5432');
-  const database = process.env.POSTGRES_DB || 'memory_box';
-  const user = process.env.POSTGRES_USER || 'postgres';
-  const password = process.env.POSTGRES_PASSWORD || 'postgres';
-  return { host, port, database, user, password, max: 10 };
+  const host = process.env.POSTGRES_HOST || 'localhost';
+  const port = parseInt(process.env.POSTGRES_PORT || '5432');
+  return {
+    host,
+    port,
+    database: 'memory_box',
+    user: 'postgres',
+    password: 'postgres',
+    max: 10,
+  };
 }
 
 export function getPool(): pg.Pool {

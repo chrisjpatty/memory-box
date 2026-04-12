@@ -1,7 +1,14 @@
 import { query } from '../db';
-import { githubFetch } from '../pipeline/url-handlers/github';
+import { githubFetch, githubHeaders } from '../pipeline/url-handlers/github';
 import { getGitHubToken } from './token-store';
 import { startSchedule, stopSchedule, isScheduleRunning } from '../jobs/scheduler';
+
+/** Parse GitHub Link header to find the "next" page URL. */
+function parseLinkNext(linkHeader: string | null): string | null {
+  if (!linkHeader) return null;
+  const match = linkHeader.match(/<([^>]+)>;\s*rel="next"/);
+  return match ? match[1] : null;
+}
 
 // --- Discovery ---
 
@@ -31,16 +38,20 @@ export interface DiscoverResult {
 export async function discoverStars(username: string, token?: string): Promise<DiscoverResult> {
   const resolvedToken = token || await getGitHubToken() || undefined;
 
-  // Paginate through all starred repos
-  let page = 1;
+  // Paginate through all starred repos using the Link header
   let allRepos: any[] = [];
   let privateExcluded = 0;
+  let nextUrl: string | null =
+    `https://api.github.com/users/${username}/starred?per_page=100`;
 
-  while (true) {
-    const batch = await githubFetch(
-      `/users/${username}/starred?per_page=100&page=${page}`,
-      resolvedToken,
-    );
+  while (nextUrl) {
+    const res = await fetch(nextUrl, {
+      headers: githubHeaders(resolvedToken),
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (!res.ok) break;
+
+    const batch = await res.json();
     if (!Array.isArray(batch) || batch.length === 0) break;
 
     for (const repo of batch) {
@@ -51,8 +62,7 @@ export async function discoverStars(username: string, token?: string): Promise<D
       }
     }
 
-    if (batch.length < 100) break;
-    page++;
+    nextUrl = parseLinkNext(res.headers.get('Link'));
   }
 
   // Batch dedup check: single query instead of N sequential queries

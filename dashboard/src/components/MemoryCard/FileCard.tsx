@@ -3,7 +3,7 @@ import type { MemoryCardProps } from './types';
 
 export function FileCard({ memory, onDelete }: MemoryCardProps) {
   return (
-    <CardShell memory={memory} onDelete={onDelete}>
+    <CardShell id={memory.id} onDelete={onDelete}>
       {/* Subtle background glow */}
       <div className="absolute inset-0 rounded-xl pointer-events-none bg-gradient-to-br from-neutral-500/[0.04] to-transparent" />
 

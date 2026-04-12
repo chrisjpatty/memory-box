@@ -48,10 +48,48 @@ class OllamaProvider implements EmbeddingProvider {
       body: JSON.stringify({ model: this.model, input: texts, truncate: true }),
     });
     if (!response.ok) {
-      throw new Error(`Ollama embed failed: ${response.status} ${await response.text()}`);
+      const body = await response.text();
+      if (response.status === 400 && body.includes('context length')) {
+        // Batch failed due to a too-long input — fall back to one-at-a-time
+        // with truncation so one oversized chunk doesn't sink the whole import.
+        return this.embedWithTruncation(texts);
+      }
+      throw new Error(`Ollama embed failed: ${response.status} ${body}`);
     }
     const data = await response.json() as { embeddings: number[][] };
     return data.embeddings;
+  }
+
+  /**
+   * Embed texts one-at-a-time, progressively truncating any that exceed the
+   * model's context window. Preserves as much content as possible by halving
+   * only the texts that actually fail.
+   */
+  private async embedWithTruncation(texts: string[]): Promise<number[][]> {
+    const results: number[][] = [];
+    for (const text of texts) {
+      let current = text;
+      while (true) {
+        const res = await fetch(`${this.baseUrl}/embed`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ model: this.model, input: [current], truncate: true }),
+        });
+        if (res.ok) {
+          const data = await res.json() as { embeddings: number[][] };
+          results.push(data.embeddings[0]);
+          break;
+        }
+        const body = await res.text();
+        if (res.status === 400 && body.includes('context length') && current.length > 100) {
+          // Halve the text and retry
+          current = current.slice(0, Math.floor(current.length / 2));
+          continue;
+        }
+        throw new Error(`Ollama embed failed: ${res.status} ${body}`);
+      }
+    }
+    return results;
   }
 }
 

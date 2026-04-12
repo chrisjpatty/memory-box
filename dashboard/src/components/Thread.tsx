@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, type KeyboardEvent } from 'react';
 import { Link } from 'react-router-dom';
+import Masonry from 'react-masonry-css';
 import { Streamdown } from 'streamdown';
 import 'streamdown/styles.css';
 import type { Message, ToolCallPart } from '../hooks/useChat';
@@ -228,13 +229,17 @@ function DisplayedMemories({ tools }: { tools: ToolCallPart[] }) {
         </div>
       )}
       {memories.length > 0 && (
-        <div className={`grid gap-3 my-2 ${memories.length === 1 ? 'grid-cols-1 max-w-sm' : 'grid-cols-2'}`}>
+        <Masonry
+          breakpointCols={{ default: 2, 640: 1 }}
+          className="flex gap-2 -ml-2 my-2"
+          columnClassName="pl-2 bg-clip-padding"
+        >
           {memories.map((m) => (
-            <Link key={m.id} to={`/memories/${m.id}`} className="block">
+            <Link key={m.id} to={`/memories/${m.id}`} className="block mb-3">
               <MemoryCard memory={m} />
             </Link>
           ))}
-        </div>
+        </Masonry>
       )}
     </div>
   );

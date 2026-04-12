@@ -7,8 +7,9 @@ let bucketReady = false;
 
 function getClient(): S3Client {
   if (!client) {
-    const host = process.env.MINIO_HOST || process.env.FILES_HOST || 'localhost';
-    const endpoint = `http://${host}:9000`;
+    const host = process.env.MINIO_HOST || process.env.KNOWLEDGE_FILES_HOST || 'knowledge-files';
+    const port = process.env.MINIO_PORT || process.env.KNOWLEDGE_FILES_PORT || '9000';
+    const endpoint = `http://${host}:${port}`;
 
     client = new S3Client({
       endpoint,

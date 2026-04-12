@@ -110,5 +110,5 @@ export async function revokeToken(id: number): Promise<boolean> {
     'UPDATE auth_tokens SET active = false WHERE id = $1 AND active = true',
     [id],
   );
-  return result.rowCount > 0;
+  return (result.rowCount ?? 0) > 0;
 }

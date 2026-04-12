@@ -20,7 +20,7 @@ export async function initDatabase(): Promise<void> {
       if (attempt === maxRetries) throw err;
       const isConnectionError = err.code === 'ECONNREFUSED' || err.code === 'ENOTFOUND' || err.code === '57P03';
       if (!isConnectionError) throw err;
-      console.log(`Waiting for database... (attempt ${attempt}/${maxRetries})`);
+      console.log(`Waiting for database at ${err.address || 'unknown'}:${err.port || 'unknown'}... (attempt ${attempt}/${maxRetries})`);
       await new Promise((r) => setTimeout(r, 2000));
     }
   }

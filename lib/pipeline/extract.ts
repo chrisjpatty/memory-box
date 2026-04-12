@@ -95,6 +95,7 @@ function processHtml(rawHtml: string, url: string): {
   title: string;
   description: string;
   cleanHtml: string;
+  ogImage: string;
 } {
   const $ = cheerio.load(rawHtml);
   const title =
@@ -156,6 +157,7 @@ async function fetchStatic(url: string): Promise<{
   title: string;
   description: string;
   cleanHtml: string;
+  ogImage: string;
 }> {
   const response = await fetch(url, {
     headers: { 'User-Agent': 'MemoryBox/1.0' },

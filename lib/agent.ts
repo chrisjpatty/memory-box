@@ -88,13 +88,9 @@ let _mastra: Mastra | null = null;
 export function createMastra(): Mastra {
   if (_mastra) return _mastra;
 
-  const host = process.env.POSTGRES_HOST || process.env.DB_HOST || '127.0.0.1';
-  const port = parseInt(process.env.DB_PORT || process.env.POSTGRES_PORT || '5432');
-  const database = process.env.POSTGRES_DB || 'memory_box';
-  const user = process.env.POSTGRES_USER || 'postgres';
-  const password = process.env.POSTGRES_PASSWORD || 'postgres';
-  const connectionString = process.env.DATABASE_URL || process.env.DB_URL ||
-    `postgresql://${user}:${password}@${host}:${port}/${database}`;
+  const host = process.env.POSTGRES_HOST || 'localhost';
+  const port = process.env.POSTGRES_PORT || '5432';
+  const connectionString = `postgresql://postgres:postgres@${host}:${port}/memory_box`;
 
   const memory = new Memory({
     storage: new PostgresStore({

@@ -10,22 +10,6 @@ agent:
   interfaces:
     frontend: true
     messaging: false
-  inputs:
-    - name: POSTGRES_HOST
-      datatype: string
-      default: knowledge-db
-    - name: POSTGRES_USER
-      datatype: string
-      default: postgres
-    - name: POSTGRES_PASSWORD
-      datatype: string
-      default: postgres
-    - name: POSTGRES_DB
-      datatype: string
-      default: memory_box
-    - name: MINIO_HOST
-      datatype: string
-      default: knowledge-files
 models:
   ollama:
     provider: ollama
@@ -35,18 +19,9 @@ models:
 
 knowledge:
   db:
-    container:
-      image: pgvector/pgvector:pg17
-      port: 5432
-      volume: /var/lib/postgresql/data
+    provider: postgres
     persistent: true
     inputs:
-      - name: POSTGRES_USER
-        datatype: string
-        default: postgres
-      - name: POSTGRES_PASSWORD
-        datatype: string
-        default: postgres
       - name: POSTGRES_DB
         datatype: string
         default: memory_box
