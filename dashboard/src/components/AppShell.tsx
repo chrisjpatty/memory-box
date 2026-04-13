@@ -1,5 +1,5 @@
-import { useRef, useEffect, useState, useCallback, type ComponentType } from 'react';
-import { Outlet, NavLink, useLocation } from 'react-router-dom';
+import { useRef, useEffect, useState, useCallback, type ComponentType, type MouseEvent } from 'react';
+import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { ChatCircleIcon as ChatCircle } from '@phosphor-icons/react/dist/icons/ChatCircle';
 import { CubeIcon as Cube } from '@phosphor-icons/react/dist/icons/Cube';
 import { GearSixIcon as GearSix } from '@phosphor-icons/react/dist/icons/GearSix';
@@ -12,17 +12,23 @@ const modes: { to: string; label: string; icon: ComponentType<IconProps>; active
   { to: '/settings', label: 'Settings', icon: GearSix, activeColor: 'text-neutral-200' },
 ];
 
+function getModeIndex(pathname: string) {
+  return modes.findIndex((m) => pathname.startsWith(m.to));
+}
+
 export function AppShell() {
   const { pathname } = useLocation();
+  const navigate = useNavigate();
   const isMemories = pathname.startsWith('/memories');
   const isChat = pathname.startsWith('/chat');
   const showOverlay = isMemories || isChat;
 
   const navRef = useRef<HTMLElement>(null);
   const linkRefs = useRef<(HTMLAnchorElement | null)[]>([]);
+  const contentRef = useRef<HTMLDivElement>(null);
   const [navOffset, setNavOffset] = useState(0);
 
-  const activeIndex = modes.findIndex((m) => pathname.startsWith(m.to));
+  const activeIndex = getModeIndex(pathname);
 
   const computeOffset = useCallback(() => {
     const nav = navRef.current;
@@ -44,6 +50,31 @@ export function AppShell() {
     window.addEventListener('resize', computeOffset);
     return () => window.removeEventListener('resize', computeOffset);
   }, [computeOffset]);
+
+  const handleModeClick = (e: MouseEvent, to: string) => {
+    const targetIndex = modes.findIndex((m) => m.to === to);
+    if (targetIndex === activeIndex) return;
+
+    if (!document.startViewTransition) return;
+
+    e.preventDefault();
+    const dir = targetIndex > activeIndex ? 'right' : 'left';
+    document.documentElement.dataset.slideDir = dir;
+
+    // Temporarily assign viewTransitionName so the API snapshots this element.
+    // We only set it during the transition to avoid creating a persistent
+    // stacking context that would trap the search bar below the overlay.
+    const el = contentRef.current;
+    if (el) el.style.viewTransitionName = 'mode-content';
+
+    const transition = document.startViewTransition(() => {
+      navigate(to);
+    });
+
+    transition.finished.then(() => {
+      if (el) el.style.viewTransitionName = '';
+    });
+  };
 
   return (
     <div className="h-screen overflow-hidden">
@@ -67,7 +98,7 @@ export function AppShell() {
           className="absolute left-1/2 flex items-center gap-6"
           style={{
             transform: `translateX(calc(-50% + ${navOffset}px))`,
-            transition: 'transform 400ms cubic-bezier(0.4, 0, 0.2, 1)',
+            transition: 'transform 330ms cubic-bezier(0.15, 0, 0.35, 1)',
           }}
         >
           {modes.map((mode, i) => {
@@ -77,6 +108,7 @@ export function AppShell() {
                 key={mode.to}
                 to={mode.to}
                 ref={(el) => { linkRefs.current[i] = el; }}
+                onClick={(e) => handleModeClick(e, mode.to)}
                 className={({ isActive }) =>
                   `flex items-center gap-1.5 px-1 text-sm font-semibold tracking-tight origin-center ${
                     isActive
@@ -87,7 +119,7 @@ export function AppShell() {
                 style={({ isActive }) => ({
                   transform: isActive ? 'scale(1.25)' : 'scale(1) translateY(2px)',
                   opacity: isActive ? 1 : 0.5,
-                  transition: 'transform 300ms ease-out, opacity 300ms ease-out',
+                  transition: 'transform 330ms ease-out, opacity 330ms ease-out',
                 })}
               >
                 <Icon size={14} weight="bold" />
@@ -108,7 +140,7 @@ export function AppShell() {
       </header>
 
       {/* Mode content (each mode layout renders its own sidebar + content) */}
-      <div className="flex-1">
+      <div className="flex-1" ref={contentRef}>
         <Outlet />
       </div>
     </div>

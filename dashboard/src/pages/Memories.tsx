@@ -49,7 +49,7 @@ export function Memories() {
 
   return (
     <div>
-      <div className="sticky -top-[26px] z-[18] -mx-8 px-8">
+      <div className="sticky -top-[26px] z-[16] -mx-8 px-8">
         <div className="relative flex items-center pt-8 pb-6">
           <div className="mx-auto w-full max-w-xl flex items-center gap-2">
             {/* Filter button */}

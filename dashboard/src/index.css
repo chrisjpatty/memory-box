@@ -1,5 +1,36 @@
 @import "tailwindcss";
 
+/* View transition animations for mode switching */
+
+/* Navigating right (e.g. Memories → Settings): old exits left, new enters from right */
+::view-transition-old(mode-content) {
+  animation: slide-to-left 250ms ease-in both;
+}
+::view-transition-new(mode-content) {
+  animation: slide-from-right 250ms cubic-bezier(0.15, 0, 0.35, 1) 80ms both;
+}
+
+/* Navigating left (e.g. Settings → Memories): old exits right, new enters from left */
+[data-slide-dir="left"]::view-transition-old(mode-content) {
+  animation-name: slide-to-right;
+}
+[data-slide-dir="left"]::view-transition-new(mode-content) {
+  animation-name: slide-from-left;
+}
+
+@keyframes slide-to-left {
+  to { opacity: 0; transform: translateX(-60px); }
+}
+@keyframes slide-from-right {
+  from { opacity: 0; transform: translateX(60px); }
+}
+@keyframes slide-to-right {
+  to { opacity: 0; transform: translateX(60px); }
+}
+@keyframes slide-from-left {
+  from { opacity: 0; transform: translateX(-60px); }
+}
+
 @keyframes shimmer {
   0% { background-position: 200% 0; }
   100% { background-position: -200% 0; }
