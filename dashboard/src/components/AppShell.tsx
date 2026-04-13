@@ -3,6 +3,7 @@ import { Outlet, NavLink, useLocation } from 'react-router-dom';
 import { ChatCircleIcon as ChatCircle } from '@phosphor-icons/react/dist/icons/ChatCircle';
 import { CubeIcon as Cube } from '@phosphor-icons/react/dist/icons/Cube';
 import { GearSixIcon as GearSix } from '@phosphor-icons/react/dist/icons/GearSix';
+import { PlusIcon as Plus } from '@phosphor-icons/react/dist/icons/Plus';
 import type { IconProps } from '@phosphor-icons/react';
 
 const modes: { to: string; label: string; icon: ComponentType<IconProps>; activeColor: string }[] = [
@@ -60,7 +61,7 @@ export function AppShell() {
         </div>
       )}
 
-      <header className="fixed top-0 left-0 right-0 h-12 flex items-center px-4 z-20">
+      <header className="fixed top-0 left-0 right-0 h-14 flex items-center px-6 z-20">
         <nav
           ref={navRef}
           className="absolute left-1/2 flex items-center gap-6"
@@ -98,14 +99,9 @@ export function AppShell() {
         <div className="ml-auto">
           <NavLink
             to="/memories/import"
-            className={({ isActive }) =>
-              `px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                isActive
-                  ? 'bg-white text-black'
-                  : 'bg-white/10 text-neutral-200 hover:bg-white/20'
-              }`
-            }
+            className="flex items-center gap-1.5 text-sm font-semibold tracking-tight text-white opacity-80 hover:opacity-100 transition-opacity"
           >
+            <Plus size={14} weight="bold" />
             Import
           </NavLink>
         </div>

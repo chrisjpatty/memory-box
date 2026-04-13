@@ -10,7 +10,7 @@ const navItems = [
 
 export function SettingsLayout() {
   return (
-    <div className="h-[calc(100vh-3rem)] mt-12 flex overflow-hidden">
+    <div className="h-[calc(100vh-3.5rem)] mt-14 flex overflow-hidden">
       <Sidebar>
         <div className="p-4 flex flex-col gap-0.5">
           <h2 className="text-xs font-medium text-neutral-500 uppercase tracking-wider px-3 mb-3">Settings</h2>
