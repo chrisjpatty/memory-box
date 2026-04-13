@@ -1,10 +1,14 @@
-import { useRef, useEffect, useState, useCallback } from 'react';
+import { useRef, useEffect, useState, useCallback, type ComponentType } from 'react';
 import { Outlet, NavLink, useLocation } from 'react-router-dom';
+import { ChatCircleIcon as ChatCircle } from '@phosphor-icons/react/dist/icons/ChatCircle';
+import { CubeIcon as Cube } from '@phosphor-icons/react/dist/icons/Cube';
+import { GearSixIcon as GearSix } from '@phosphor-icons/react/dist/icons/GearSix';
+import type { IconProps } from '@phosphor-icons/react';
 
-const modes = [
-  { to: '/chat', label: 'Chat' },
-  { to: '/memories', label: 'Memories' },
-  { to: '/settings', label: 'Settings' },
+const modes: { to: string; label: string; icon: ComponentType<IconProps>; activeColor: string }[] = [
+  { to: '/chat', label: 'Chat', icon: ChatCircle, activeColor: 'text-blue-200' },
+  { to: '/memories', label: 'Memories', icon: Cube, activeColor: 'text-green-200' },
+  { to: '/settings', label: 'Settings', icon: GearSix, activeColor: 'text-neutral-200' },
 ];
 
 export function AppShell() {
@@ -59,33 +63,37 @@ export function AppShell() {
       <header className="fixed top-0 left-0 right-0 h-12 flex items-center px-4 z-20">
         <nav
           ref={navRef}
-          className="absolute left-1/2 flex items-center gap-3"
+          className="absolute left-1/2 flex items-center gap-6"
           style={{
             transform: `translateX(calc(-50% + ${navOffset}px))`,
             transition: 'transform 400ms cubic-bezier(0.4, 0, 0.2, 1)',
           }}
         >
-          {modes.map((mode, i) => (
-            <NavLink
-              key={mode.to}
-              to={mode.to}
-              ref={(el) => { linkRefs.current[i] = el; }}
-              className={({ isActive }) =>
-                `px-1 text-sm font-semibold tracking-tight origin-center ${
-                  isActive
-                    ? 'text-white'
-                    : 'text-neutral-400 hover:opacity-75'
-                }`
-              }
-              style={({ isActive }) => ({
-                transform: isActive ? 'scale(1.25)' : 'scale(1) translateY(2px)',
-                opacity: isActive ? 1 : 0.5,
-                transition: 'transform 300ms ease-out, opacity 300ms ease-out',
-              })}
-            >
-              {mode.label}
-            </NavLink>
-          ))}
+          {modes.map((mode, i) => {
+            const Icon = mode.icon;
+            return (
+              <NavLink
+                key={mode.to}
+                to={mode.to}
+                ref={(el) => { linkRefs.current[i] = el; }}
+                className={({ isActive }) =>
+                  `flex items-center gap-1.5 px-1 text-sm font-semibold tracking-tight origin-center ${
+                    isActive
+                      ? mode.activeColor
+                      : 'text-neutral-400 hover:opacity-75'
+                  }`
+                }
+                style={({ isActive }) => ({
+                  transform: isActive ? 'scale(1.25)' : 'scale(1) translateY(2px)',
+                  opacity: isActive ? 1 : 0.5,
+                  transition: 'transform 300ms ease-out, opacity 300ms ease-out',
+                })}
+              >
+                <Icon size={14} weight="bold" />
+                {mode.label}
+              </NavLink>
+            );
+          })}
         </nav>
         <div className="ml-auto">
           <NavLink
