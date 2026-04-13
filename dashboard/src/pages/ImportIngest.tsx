@@ -65,7 +65,7 @@ export function ImportIngest() {
   const hasInput = content.trim() || files.length > 0;
 
   return (
-    <div className="max-w-3xl">
+    <div>
       <h1 className="text-2xl font-bold mb-1">Import</h1>
       <p className="text-neutral-500 text-sm mb-6">Drop anything in — text, a link, an image, a file.</p>
 

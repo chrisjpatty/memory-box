@@ -12,7 +12,11 @@ const modes: { to: string; label: string; icon: ComponentType<IconProps>; active
   { to: '/settings', label: 'Settings', icon: GearSix, activeColor: 'text-neutral-200' },
 ];
 
-function getModeIndex(pathname: string) {
+// Import sits conceptually to the right of all mode tabs (index 3)
+const IMPORT_INDEX = modes.length;
+
+function getNavIndex(pathname: string) {
+  if (pathname.startsWith('/import')) return IMPORT_INDEX;
   return modes.findIndex((m) => pathname.startsWith(m.to));
 }
 
@@ -28,7 +32,7 @@ export function AppShell() {
   const contentRef = useRef<HTMLDivElement>(null);
   const [navOffset, setNavOffset] = useState(0);
 
-  const activeIndex = getModeIndex(pathname);
+  const activeIndex = getNavIndex(pathname);
 
   const computeOffset = useCallback(() => {
     const nav = navRef.current;
@@ -51,8 +55,7 @@ export function AppShell() {
     return () => window.removeEventListener('resize', computeOffset);
   }, [computeOffset]);
 
-  const handleModeClick = (e: MouseEvent, to: string) => {
-    const targetIndex = modes.findIndex((m) => m.to === to);
+  const handleNavTransition = (e: MouseEvent, to: string, targetIndex: number) => {
     if (targetIndex === activeIndex) return;
 
     if (!document.startViewTransition) return;
@@ -61,9 +64,6 @@ export function AppShell() {
     const dir = targetIndex > activeIndex ? 'right' : 'left';
     document.documentElement.dataset.slideDir = dir;
 
-    // Temporarily assign viewTransitionName so the API snapshots this element.
-    // We only set it during the transition to avoid creating a persistent
-    // stacking context that would trap the search bar below the overlay.
     const el = contentRef.current;
     if (el) el.style.viewTransitionName = 'mode-content';
 
@@ -108,7 +108,7 @@ export function AppShell() {
                 key={mode.to}
                 to={mode.to}
                 ref={(el) => { linkRefs.current[i] = el; }}
-                onClick={(e) => handleModeClick(e, mode.to)}
+                onClick={(e) => handleNavTransition(e, mode.to, i)}
                 className={({ isActive }) =>
                   `flex items-center gap-1.5 px-1 text-sm font-semibold tracking-tight origin-center ${
                     isActive
@@ -130,8 +130,20 @@ export function AppShell() {
         </nav>
         <div className="ml-auto">
           <NavLink
-            to="/memories/import"
-            className="flex items-center gap-1.5 text-sm font-semibold tracking-tight text-white opacity-80 hover:opacity-100 transition-opacity"
+            to="/import"
+            onClick={(e) => handleNavTransition(e, '/import', IMPORT_INDEX)}
+            className={({ isActive }) =>
+              `flex items-center gap-1.5 text-sm font-semibold tracking-tight origin-center ${
+                isActive
+                  ? 'text-white'
+                  : 'text-neutral-400 hover:opacity-75'
+              }`
+            }
+            style={({ isActive }) => ({
+              transform: isActive ? 'scale(1.1)' : 'scale(1)',
+              opacity: isActive ? 1 : 0.5,
+              transition: 'transform 330ms ease-out, opacity 330ms ease-out',
+            })}
           >
             <Plus size={14} weight="bold" />
             Import
