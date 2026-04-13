@@ -9,7 +9,7 @@ import { ImportIngest } from './pages/ImportIngest';
 import { ImportActivity } from './pages/ImportActivity';
 import { AppShell } from './components/AppShell';
 import { ChatLayout } from './components/ChatLayout';
-import { LibraryLayout } from './components/LibraryLayout';
+import { MemoriesLayout } from './components/MemoriesLayout';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { SettingsLayout } from './pages/settings/SettingsLayout';
 import { General } from './pages/settings/General';
@@ -25,7 +25,7 @@ export default function App() {
       <Route path="/oauth/consent" element={<OAuthConsent />} />
       <Route element={<ProtectedRoute />}>
         <Route element={<AppShell />}>
-          <Route path="library" element={<LibraryLayout />}>
+          <Route path="memories" element={<MemoriesLayout />}>
             <Route index element={<Memories />} />
             <Route path=":id" element={<MemoryView />} />
             <Route path="import" element={<ImportIngest />} />
@@ -45,7 +45,7 @@ export default function App() {
           </Route>
         </Route>
       </Route>
-      <Route path="*" element={<Navigate to="/library" replace />} />
+      <Route path="*" element={<Navigate to="/memories" replace />} />
     </Routes>
   );
 }

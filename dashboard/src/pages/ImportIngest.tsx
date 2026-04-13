@@ -82,7 +82,7 @@ export function ImportIngest() {
           ) : (
             <span>
               Saved "{result.title}" as {result.contentType}.{' '}
-              <button onClick={() => navigate(`/library/${result.memoryId}`)} className="underline hover:text-green-300">
+              <button onClick={() => navigate(`/memories/${result.memoryId}`)} className="underline hover:text-green-300">
                 View
               </button>
             </span>

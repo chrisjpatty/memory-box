@@ -129,7 +129,7 @@ export function MemoryList({ searchQuery, typeFilters, onCountChange }: MemoryLi
           columnClassName="pl-2 bg-clip-padding"
         >
           {memories.map((m) => (
-            <Link key={m.id} to={`/library/${m.id}`} className="block mb-4">
+            <Link key={m.id} to={`/memories/${m.id}`} className="block mb-4">
               <MemoryCard memory={m} onDelete={handleDelete} />
             </Link>
           ))}

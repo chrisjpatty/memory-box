@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { MemoryList } from '../components/MemoryList';
-import type { LibraryContext } from '../components/LibraryLayout';
+import type { MemoriesContext } from '../components/MemoriesLayout';
 import { TextAaIcon as TextAa } from '@phosphor-icons/react/dist/icons/TextAa';
 import { LinkIcon as LinkIcon } from '@phosphor-icons/react/dist/icons/Link';
 import { TwitterLogoIcon as TwitterLogo } from '@phosphor-icons/react/dist/icons/TwitterLogo';
@@ -22,7 +22,7 @@ const typeFilters = [
 ];
 
 export function Memories() {
-  const { searchQuery, setSearchQuery, typeFilters: activeTypes, setTypeFilters } = useOutletContext<LibraryContext>();
+  const { searchQuery, setSearchQuery, typeFilters: activeTypes, setTypeFilters } = useOutletContext<MemoriesContext>();
   const [countInfo, setCountInfo] = useState<{ count: number; isSearching: boolean }>({ count: 0, isSearching: false });
   const [filterOpen, setFilterOpen] = useState(false);
   const filterRef = useRef<HTMLDivElement>(null);

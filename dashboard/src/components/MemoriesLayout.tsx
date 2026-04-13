@@ -1,13 +1,13 @@
 import { Outlet, useSearchParams } from 'react-router-dom';
 
-export interface LibraryContext {
+export interface MemoriesContext {
   searchQuery: string;
   typeFilters: string[];
   setSearchQuery: (q: string) => void;
   setTypeFilters: (types: string[]) => void;
 }
 
-export function LibraryLayout() {
+export function MemoriesLayout() {
   const [searchParams, setSearchParams] = useSearchParams();
   const searchQuery = searchParams.get('q') ?? '';
   const activeTypes = searchParams.get('types')?.split(',').filter(Boolean) ?? [];
@@ -31,7 +31,7 @@ export function LibraryLayout() {
   return (
     <div className="h-[calc(100vh-3rem)] mt-12 overflow-hidden">
       <main className="h-full px-8 overflow-auto">
-        <Outlet context={{ searchQuery, typeFilters: activeTypes, setSearchQuery, setTypeFilters: setActiveTypes } satisfies LibraryContext} />
+        <Outlet context={{ searchQuery, typeFilters: activeTypes, setSearchQuery, setTypeFilters: setActiveTypes } satisfies MemoriesContext} />
       </main>
     </div>
   );

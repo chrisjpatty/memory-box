@@ -3,15 +3,15 @@ import { Outlet, NavLink, useLocation } from 'react-router-dom';
 
 const modes = [
   { to: '/chat', label: 'Chat' },
-  { to: '/library', label: 'Library' },
+  { to: '/memories', label: 'Memories' },
   { to: '/settings', label: 'Settings' },
 ];
 
 export function AppShell() {
   const { pathname } = useLocation();
-  const isLibrary = pathname.startsWith('/library');
+  const isMemories = pathname.startsWith('/memories');
   const isChat = pathname.startsWith('/chat');
-  const showOverlay = isLibrary || isChat;
+  const showOverlay = isMemories || isChat;
 
   const navRef = useRef<HTMLElement>(null);
   const linkRefs = useRef<(HTMLAnchorElement | null)[]>([]);
@@ -44,7 +44,7 @@ export function AppShell() {
     <div className="h-screen overflow-hidden">
       {/* Blur + gradient overlay behind header */}
       {showOverlay && (
-        <div className={`fixed top-0 left-0 right-0 z-[15] pointer-events-none ${isLibrary ? 'h-32' : 'h-24'}`}>
+        <div className={`fixed top-0 left-0 right-0 z-[15] pointer-events-none ${isMemories ? 'h-32' : 'h-24'}`}>
           <div
             className="absolute inset-0 backdrop-blur-md"
             style={{ maskImage: 'linear-gradient(to bottom, black 50%, transparent)', WebkitMaskImage: 'linear-gradient(to bottom, black 50%, transparent)' }}
@@ -89,7 +89,7 @@ export function AppShell() {
         </nav>
         <div className="ml-auto">
           <NavLink
-            to="/library/import"
+            to="/memories/import"
             className={({ isActive }) =>
               `px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${
                 isActive

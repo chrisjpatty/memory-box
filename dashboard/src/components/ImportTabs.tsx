@@ -2,9 +2,9 @@ import { NavLink } from 'react-router-dom';
 import { useActiveJobs } from '../hooks/queries';
 
 const sourceTabs = [
-  { to: '/library/import', label: 'Manual Ingest', end: true },
-  { to: '/library/import/github', label: 'GitHub Stars' },
-  { to: '/library/import/twitter', label: 'Twitter Bookmarks' },
+  { to: '/memories/import', label: 'Manual Ingest', end: true },
+  { to: '/memories/import/github', label: 'GitHub Stars' },
+  { to: '/memories/import/twitter', label: 'Twitter Bookmarks' },
 ];
 
 const sourceTabClass = (isActive: boolean) =>
@@ -42,7 +42,7 @@ export function ImportTabs() {
       <div className="ml-auto flex items-center gap-3">
         <div className="w-px h-5 bg-neutral-700" />
         <NavLink
-          to="/library/import/activity"
+          to="/memories/import/activity"
           className={({ isActive }) => activityTabClass(isActive)}
         >
           <span className="flex items-center gap-2">

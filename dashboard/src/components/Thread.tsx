@@ -235,7 +235,7 @@ function DisplayedMemories({ tools }: { tools: ToolCallPart[] }) {
           columnClassName="pl-2 bg-clip-padding"
         >
           {memories.map((m) => (
-            <Link key={m.id} to={`/library/${m.id}`} className="block mb-3">
+            <Link key={m.id} to={`/memories/${m.id}`} className="block mb-3">
               <MemoryCard memory={m} />
             </Link>
           ))}
