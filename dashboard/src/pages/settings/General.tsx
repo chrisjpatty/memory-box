@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, type FormEvent } from 'react';
-import { Link } from 'react-router-dom';
-import { useChangePassword } from '../../hooks/queries';
+import { Link, useNavigate } from 'react-router-dom';
+import { useChangePassword, useLogout } from '../../hooks/queries';
 import Prism from 'prismjs';
 import 'prismjs/components/prism-bash';
 import 'prismjs/components/prism-python';
@@ -243,8 +243,16 @@ function ChangePassword() {
 }
 
 export function General() {
+  const navigate = useNavigate();
+  const logout = useLogout();
   const [endpointCopied, setEndpointCopied] = useState(false);
   const endpoint = `${window.location.origin}/ingest`;
+
+  const handleLogout = () => {
+    logout.mutate(undefined, {
+      onSuccess: () => navigate('/login'),
+    });
+  };
 
   const handleCopyEndpoint = () => {
     navigator.clipboard.writeText(endpoint);
@@ -283,10 +291,21 @@ export function General() {
         </div>
       </section>
 
-      <section>
+      <section className="pb-6 mb-6 border-b border-neutral-800">
         <h3 className="text-sm font-medium text-neutral-200 mb-1">API Reference</h3>
         <p className="text-xs text-neutral-500 mb-3">Example code for ingesting memories. Replace <code className="text-neutral-400">&lt;your-token&gt;</code> with an API token.</p>
         <ApiReference />
+      </section>
+
+      <section>
+        <h3 className="text-sm font-medium text-neutral-200 mb-1">Session</h3>
+        <p className="text-xs text-neutral-500 mb-3">Sign out of your account.</p>
+        <button
+          onClick={handleLogout}
+          className="px-4 py-2 rounded-lg text-sm font-medium border border-neutral-700 text-neutral-300 hover:text-white hover:border-neutral-500 transition-colors"
+        >
+          Logout
+        </button>
       </section>
     </div>
   );

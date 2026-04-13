@@ -1,4 +1,5 @@
 import { Outlet, NavLink } from 'react-router-dom';
+import { Sidebar } from '../../components/Sidebar';
 
 const navItems = [
   { to: '/settings', label: 'General', end: true },
@@ -9,17 +10,17 @@ const navItems = [
 
 export function SettingsLayout() {
   return (
-    <div className="flex gap-10 max-w-4xl">
-      <nav className="w-40 shrink-0">
-        <h1 className="text-lg font-bold mb-4">Settings</h1>
-        <div className="flex flex-col gap-0.5">
+    <div className="h-[calc(100vh-3rem)] mt-12 flex overflow-hidden">
+      <Sidebar>
+        <div className="p-4 flex flex-col gap-0.5">
+          <h2 className="text-xs font-medium text-neutral-500 uppercase tracking-wider px-3 mb-3">Settings</h2>
           {navItems.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}
               end={'end' in item ? item.end : false}
               className={({ isActive }) =>
-                `px-3 py-1.5 rounded-lg text-sm transition-colors ${
+                `px-3 py-2 rounded-lg text-sm transition-colors ${
                   isActive
                     ? item.danger
                       ? 'bg-red-950/50 text-red-400 font-medium'
@@ -34,10 +35,12 @@ export function SettingsLayout() {
             </NavLink>
           ))}
         </div>
-      </nav>
-      <div className="flex-1 min-w-0">
+      </Sidebar>
+
+      {/* Content */}
+      <main className="ml-56 flex-1 min-h-0 pt-8 px-8 overflow-auto">
         <Outlet />
-      </div>
+      </main>
     </div>
   );
 }

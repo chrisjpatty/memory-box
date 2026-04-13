@@ -235,7 +235,7 @@ function DisplayedMemories({ tools }: { tools: ToolCallPart[] }) {
           columnClassName="pl-2 bg-clip-padding"
         >
           {memories.map((m) => (
-            <Link key={m.id} to={`/memories/${m.id}`} className="block mb-3">
+            <Link key={m.id} to={`/library/${m.id}`} className="block mb-3">
               <MemoryCard memory={m} />
             </Link>
           ))}
@@ -310,11 +310,11 @@ export function Thread({ messages, isLoading, isStreaming, onSend }: ThreadProps
       <div className="flex-1">
         {messages.length === 0 ? (
           isLoading ? (
-            <div className="flex items-center justify-center min-h-[calc(100vh-8rem)]">
+            <div className="flex items-center justify-center min-h-[calc(100vh-11rem)]">
               <Spinner />
             </div>
           ) : (
-          <div className="flex flex-col items-center justify-center min-h-[calc(100vh-8rem)] text-center px-4">
+          <div className="flex flex-col items-center justify-center min-h-[calc(100vh-11rem)] text-center px-4">
             <h1 className="text-2xl font-bold mb-2">Memory Box</h1>
             <p className="text-neutral-500 text-sm max-w-md">
               Search your memories with natural language. Ask a question or describe what you're looking for.

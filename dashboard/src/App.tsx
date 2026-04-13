@@ -7,7 +7,9 @@ import { Import } from './pages/Import';
 import { ImportTwitter } from './pages/ImportTwitter';
 import { ImportIngest } from './pages/ImportIngest';
 import { ImportActivity } from './pages/ImportActivity';
-import { Layout } from './components/Layout';
+import { AppShell } from './components/AppShell';
+import { ChatLayout } from './components/ChatLayout';
+import { LibraryLayout } from './components/LibraryLayout';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { SettingsLayout } from './pages/settings/SettingsLayout';
 import { General } from './pages/settings/General';
@@ -22,15 +24,19 @@ export default function App() {
       <Route path="/login" element={<Login />} />
       <Route path="/oauth/consent" element={<OAuthConsent />} />
       <Route element={<ProtectedRoute />}>
-        <Route element={<Layout />}>
-          <Route index element={<Chat />} />
-          <Route path="chat/*" element={<Chat />} />
-          <Route path="memories" element={<Memories />} />
-          <Route path="memories/:id" element={<MemoryView />} />
-          <Route path="import" element={<ImportIngest />} />
-          <Route path="import/github" element={<Import />} />
-          <Route path="import/twitter" element={<ImportTwitter />} />
-          <Route path="import/activity" element={<ImportActivity />} />
+        <Route element={<AppShell />}>
+          <Route path="library" element={<LibraryLayout />}>
+            <Route index element={<Memories />} />
+            <Route path=":id" element={<MemoryView />} />
+            <Route path="import" element={<ImportIngest />} />
+            <Route path="import/github" element={<Import />} />
+            <Route path="import/twitter" element={<ImportTwitter />} />
+            <Route path="import/activity" element={<ImportActivity />} />
+          </Route>
+          <Route path="chat" element={<ChatLayout />}>
+            <Route index element={<Chat />} />
+            <Route path=":id" element={<Chat />} />
+          </Route>
           <Route path="settings" element={<SettingsLayout />}>
             <Route index element={<General />} />
             <Route path="tokens" element={<Tokens />} />
@@ -39,7 +45,7 @@ export default function App() {
           </Route>
         </Route>
       </Route>
-      <Route path="*" element={<Navigate to="/" replace />} />
+      <Route path="*" element={<Navigate to="/library" replace />} />
     </Routes>
   );
 }

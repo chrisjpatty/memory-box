@@ -450,7 +450,7 @@ export function Import() {
 
           {isDone && !isCancelled && progress.status !== 'failed' && (
             <div className="mt-4 pt-3 border-t border-neutral-800">
-              <a href="/memories" className="text-sm text-blue-400 hover:text-blue-300">
+              <a href="/library" className="text-sm text-blue-400 hover:text-blue-300">
                 View imported memories &rarr;
               </a>
             </div>

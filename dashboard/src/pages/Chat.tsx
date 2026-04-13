@@ -6,8 +6,7 @@ import { useChat } from '../hooks/useChat';
 import { queryKeys } from '../hooks/queries';
 
 export function Chat() {
-  const { '*': rest } = useParams();
-  const id = rest || undefined;
+  const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const qc = useQueryClient();
 

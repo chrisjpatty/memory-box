@@ -1,11 +1,6 @@
 import { Outlet, NavLink, useNavigate, useParams } from 'react-router-dom';
-import { useLogout, useConversations, useDeleteConversation } from '../hooks/queries';
-
-const navItems = [
-  { to: '/memories', label: 'Memories' },
-  { to: '/import', label: 'Import' },
-  { to: '/settings', label: 'Settings' },
-];
+import { useConversations, useDeleteConversation } from '../hooks/queries';
+import { Sidebar } from './Sidebar';
 
 function formatRelativeDate(iso: string): string {
   const date = new Date(iso);
@@ -20,35 +15,26 @@ function formatRelativeDate(iso: string): string {
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
-export function Layout() {
+export function ChatLayout() {
   const navigate = useNavigate();
   const { id: activeConversationId } = useParams<{ id: string }>();
-  const logout = useLogout();
   const { data } = useConversations();
   const deleteConversation = useDeleteConversation();
 
   const conversations = data?.conversations ?? [];
 
-  const handleLogout = () => {
-    logout.mutate(undefined, {
-      onSuccess: () => navigate('/login'),
-    });
-  };
-
   const handleDelete = (e: React.MouseEvent, id: string) => {
     e.preventDefault();
     e.stopPropagation();
     deleteConversation.mutate(id);
-    if (activeConversationId === id) navigate('/');
+    if (activeConversationId === id) navigate('/chat');
   };
 
   return (
-    <div className="h-screen flex overflow-hidden">
-      <aside className="fixed top-0 left-0 w-56 h-screen bg-neutral-900 border-r border-neutral-800 flex flex-col overflow-hidden z-10">
+    <div className="h-[calc(100vh-3rem)] mt-12 flex overflow-hidden">
+      <Sidebar>
         <div className="p-4 pb-0">
-          <h1 className="text-lg font-bold mb-4 px-2">Memory Box</h1>
-
-          {/* New chat button */}
+          <h2 className="text-xs font-medium text-neutral-500 uppercase tracking-wider px-3 mb-3">Chat History</h2>
           <NavLink
             to="/chat"
             end
@@ -98,32 +84,9 @@ export function Layout() {
             </div>
           )}
         </div>
+      </Sidebar>
 
-        {/* Bottom nav */}
-        <div className="border-t border-neutral-800 p-4 flex flex-col gap-1">
-          {navItems.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              className={({ isActive }) =>
-                `px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  isActive
-                    ? 'bg-neutral-800 text-white'
-                    : 'text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800/50'
-                }`
-              }
-            >
-              {item.label}
-            </NavLink>
-          ))}
-          <button
-            onClick={handleLogout}
-            className="px-3 py-2 rounded-lg text-sm text-neutral-500 hover:text-neutral-300 hover:bg-neutral-800/50 transition-colors text-left"
-          >
-            Logout
-          </button>
-        </div>
-      </aside>
+      {/* Content */}
       <main className="ml-56 flex-1 min-h-0 pt-8 px-8 overflow-auto">
         <Outlet />
       </main>
