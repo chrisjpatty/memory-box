@@ -7,6 +7,7 @@ import TurndownService from 'turndown';
 import { PDFParse } from 'pdf-parse';
 import { tryUrlHandler } from './url-handlers';
 import { isTweetUrl } from './url-handlers/twitter';
+import { fetchTweetSyndication, buildCleanTweetText, bestVideoUrl } from './url-handlers/twitter-syndication';
 import { resolveRelativeUrls } from './url-utils';
 import { downloadAndLocalizeImages, storeMedia } from './media';
 import type { ClassificationResult } from '../types';
@@ -205,6 +206,7 @@ function parseTweetFromJinaMarkdown(markdown: string, url: string): {
   handle: string;
   avatarUrl: string;
   mediaUrls: string[];
+  createdAt: string;
   views: string;
   replies: string;
   retweets: string;
@@ -221,40 +223,77 @@ function parseTweetFromJinaMarkdown(markdown: string, url: string): {
   const avatarMatch = markdown.match(/\[!\[Image[^\]]*\]\((https:\/\/pbs\.twimg\.com\/profile_images\/[^)]+)\)/);
   const avatarUrl = avatarMatch?.[1]?.replace('_normal.', '_bigger.') || '';
 
-  // Tweet text: the paragraph between the handle line and the first image or timestamp
+  // Tweet text: the paragraph between the handle line and the first image/video or timestamp.
+  // Lookahead matches: [![Image (linked image), ![Image (bare image/video thumb),
+  // [Last edited, or [<digit> (timestamp/stats).
   const handlePattern = `\\[@${handle || '\\w+'}\\]`;
-  const textMatch = markdown.match(new RegExp(handlePattern + '\\([^)]+\\)\\s*\\n\\n([\\s\\S]*?)(?=\\n\\n\\[!\\[Image|\\n\\n\\[Last edited|\\n\\n\\[\\d)', 'i'));
-  const tweetText = textMatch?.[1]?.trim() || '';
+  const textMatch = markdown.match(new RegExp(
+    handlePattern + '\\([^)]+\\)\\s*\\n\\n([\\s\\S]*?)(?=\\n\\n!\\[Image|\\n\\n\\[!\\[Image|\\n\\n\\[Last edited|\\n\\n\\[\\d)',
+    'i',
+  ));
+  let tweetText = textMatch?.[1]?.trim() || '';
 
-  // Media: all twimg media URLs (not profile images)
+  // Clean markdown artifacts from tweet text
+  tweetText = tweetText
+    .replace(/!\[[^\]]*\]\([^)]+\)/g, '')              // strip markdown images
+    .replace(/\[([^\]]+)\]\(https?:\/\/t\.co\/[^)]+\)/g, '$1') // [display](t.co/...) → display
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+
+  // Media: all twimg media URLs (photos and video thumbnails, not profile images)
   const mediaUrls: string[] = [];
-  const mediaRegex = /\(https:\/\/pbs\.twimg\.com\/media\/([^)]+)\)/g;
+  const mediaRegex = /\((https:\/\/pbs\.twimg\.com\/(?:media|amplify_video_thumb)\/[^)]+)\)/g;
   let match;
   while ((match = mediaRegex.exec(markdown)) !== null) {
-    // Upgrade to large format
-    const mediaUrl = `https://pbs.twimg.com/media/${match[1]}`.replace(/name=\w+/, 'name=large');
+    let mediaUrl = match[1];
+    // Upgrade photos to large format (video thumbs don't use the name param)
+    if (mediaUrl.includes('/media/')) {
+      mediaUrl = mediaUrl.replace(/name=\w+/, 'name=large');
+    }
     mediaUrls.push(mediaUrl);
+  }
+
+  // Timestamp: Jina renders as "[7:10 PM · Apr 8, 2026](link)"
+  let createdAt = '';
+  const tsMatch = markdown.match(/\[(\d{1,2}:\d{2}\s*[AP]M\s*·\s*[A-Za-z]{3}\s+\d{1,2},\s*\d{4})\]\(/i);
+  if (tsMatch) {
+    try {
+      const cleaned = tsMatch[1].replace(/\s*·\s*/, ' ');
+      createdAt = new Date(cleaned).toISOString();
+    } catch { /* skip */ }
   }
 
   // Engagement stats: after the views line, X renders bare numbers on separate lines.
   // The count varies — tweets with zero engagement omit those stats entirely.
   // Order when present: replies, retweets, likes, bookmarks
-  const viewsMatch = markdown.match(/([\d,]+)\s*Views?\]/i);
+  const viewsMatch = markdown.match(/([\d,]+[KMB]?)\s*Views?\]/i);
   const statsNums: string[] = [];
-  const afterViews = markdown.match(/\[[\d,]+ Views?\][^\n]*\n([\s\S]*?)(?=\n##|\nRead \d|\n\[Show more)/i);
+  const afterViews = markdown.match(/\[[\d,]+[KMB]?\s*Views?\][^\n]*\n([\s\S]*?)(?=\n##|\nRead \d|\n\[Show more)/i);
   if (afterViews) {
     const numMatches = afterViews[1].match(/\b(\d[\d,]*)\b/g);
     if (numMatches) statsNums.push(...numMatches.map((n) => n.replace(/,/g, '')));
   }
 
+  // Parse views — handle suffixed values like "11K"
+  let views = '0';
+  if (viewsMatch) {
+    const raw = viewsMatch[1].replace(/,/g, '');
+    const suffixMatch = raw.match(/^(\d+(?:\.\d+)?)([KMB])$/i);
+    if (suffixMatch) {
+      const multiplier = { K: 1000, M: 1_000_000, B: 1_000_000_000 }[suffixMatch[2].toUpperCase()] || 1;
+      views = String(Math.round(parseFloat(suffixMatch[1]) * multiplier));
+    } else {
+      views = raw;
+    }
+  }
+
   // If we have all 4 stats, map them to specific fields. Otherwise, sum as engagements.
-  const views = viewsMatch?.[1]?.replace(/,/g, '') || '0';
   if (statsNums.length >= 4) {
-    return { tweetText, authorName, handle, avatarUrl, mediaUrls, views,
+    return { tweetText, authorName, handle, avatarUrl, mediaUrls, createdAt, views,
       replies: statsNums[0], retweets: statsNums[1], likes: statsNums[2], bookmarks: statsNums[3] };
   }
   const engagements = statsNums.reduce((sum, n) => sum + parseInt(n, 10), 0);
-  return { tweetText, authorName, handle, avatarUrl, mediaUrls, views,
+  return { tweetText, authorName, handle, avatarUrl, mediaUrls, createdAt, views,
     replies: '0', retweets: '0', likes: '0', bookmarks: '0',
     engagements: String(engagements) };
 }
@@ -295,51 +334,102 @@ export async function extractUrl(url: string): Promise<ExtractionResult> {
   const rawFetched = await fetchViaJina(trimmedUrl) ?? await fetchStatic(trimmedUrl);
   const markdown = resolveRelativeUrls(rawFetched.markdown, trimmedUrl);
 
-  // Tweet URLs via Jina: parse structured fields from the markdown
+  // Tweet URLs: Jina for page content + syndication API for structured data
   if (isTweetUrl(trimmedUrl)) {
-    const tweet = parseTweetFromJinaMarkdown(markdown, trimmedUrl);
+    const jinaTweet = parseTweetFromJinaMarkdown(markdown, trimmedUrl);
     const tweetIdMatch = trimmedUrl.match(/\/status\/(\d+)/);
+    const tweetId = tweetIdMatch?.[1] || '';
 
-    const cleanText = tweet.tweetText || rawFetched.title || '';
-    const title = tweet.handle
-      ? `@${tweet.handle}: ${cleanText.slice(0, 100)}${cleanText.length > 100 ? '…' : ''}`
+    // Enrich with syndication API (video URLs, verification, clean text, entities)
+    const syndication = tweetId ? await fetchTweetSyndication(tweetId) : null;
+
+    // Prefer syndication for author info, fall back to Jina
+    const authorName = syndication?.user?.name || jinaTweet.authorName;
+    const handle = syndication?.user?.screen_name || jinaTweet.handle;
+    const verified = syndication?.user?.is_blue_verified ?? false;
+    const createdAt = syndication?.created_at || jinaTweet.createdAt || '';
+
+    // Prefer syndication for clean text (with expanded URLs), fall back to Jina
+    const cleanText = (syndication ? buildCleanTweetText(syndication) : null)
+      || jinaTweet.tweetText || rawFetched.title || '';
+
+    const title = handle
+      ? `@${handle}: ${cleanText.replace(/\n+/g, ' ').slice(0, 100)}${cleanText.length > 100 ? '…' : ''}`
       : rawFetched.title;
 
     // Build rich search text with all visible context
-    const searchParts = [];
-    if (tweet.authorName) searchParts.push(tweet.authorName);
-    if (tweet.handle) searchParts.push(`@${tweet.handle}`);
+    const searchParts: string[] = [];
+    if (authorName) searchParts.push(authorName);
+    if (handle) searchParts.push(`@${handle}`);
     if (cleanText) searchParts.push(cleanText);
 
-    // Download tweet media and avatar, store via media table
+    // Build media lists from syndication (preferred) or Jina thumbnails
     const localizedImages: LocalizedImage[] = [];
     const localMediaUrls: string[] = [];
-    let avatarMediaId = '';
+    const mediaTypes: string[] = [];
+    const videoUrls: string[] = [];
 
-    // Download media images in parallel
-    const mediaResults = await Promise.all(
-      tweet.mediaUrls.map(async (url) => {
-        try {
-          const res = await fetch(url, { signal: AbortSignal.timeout(15_000) });
-          if (!res.ok) return null;
-          const buf = Buffer.from(await res.arrayBuffer());
-          const ct = res.headers.get('content-type') || 'image/jpeg';
-          return await storeMedia(buf, ct);
-        } catch { return null; }
-      }),
-    );
+    if (syndication?.mediaDetails?.length) {
+      // Use syndication for typed media details
+      const thumbResults = await Promise.all(
+        syndication.mediaDetails.map(async (media) => {
+          try {
+            const res = await fetch(media.media_url_https, { signal: AbortSignal.timeout(15_000) });
+            if (!res.ok) return null;
+            const buf = Buffer.from(await res.arrayBuffer());
+            const ct = res.headers.get('content-type') || 'image/jpeg';
+            return await storeMedia(buf, ct);
+          } catch { return null; }
+        }),
+      );
 
-    for (const img of mediaResults) {
-      if (img) {
-        localizedImages.push(img);
-        localMediaUrls.push(`/api/media/${img.id}`);
+      for (let i = 0; i < syndication.mediaDetails.length; i++) {
+        const media = syndication.mediaDetails[i];
+        const stored = thumbResults[i];
+        if (stored) {
+          localizedImages.push(stored);
+          localMediaUrls.push(`/api/media/${stored.id}`);
+        } else {
+          // Fallback to external thumbnail URL
+          localMediaUrls.push(media.media_url_https);
+        }
+        mediaTypes.push(media.type);
+        if ((media.type === 'video' || media.type === 'animated_gif') && media.video_info?.variants) {
+          videoUrls.push(bestVideoUrl(media.video_info.variants));
+        } else {
+          videoUrls.push('');
+        }
+      }
+    } else if (jinaTweet.mediaUrls.length > 0) {
+      // Fallback: use Jina-extracted thumbnails (no video URLs or type info)
+      const mediaResults = await Promise.all(
+        jinaTweet.mediaUrls.map(async (url) => {
+          try {
+            const res = await fetch(url, { signal: AbortSignal.timeout(15_000) });
+            if (!res.ok) return null;
+            const buf = Buffer.from(await res.arrayBuffer());
+            const ct = res.headers.get('content-type') || 'image/jpeg';
+            return await storeMedia(buf, ct);
+          } catch { return null; }
+        }),
+      );
+      for (const img of mediaResults) {
+        if (img) {
+          localizedImages.push(img);
+          localMediaUrls.push(`/api/media/${img.id}`);
+          mediaTypes.push('photo');
+          videoUrls.push('');
+        }
       }
     }
 
-    // Download avatar
-    if (tweet.avatarUrl) {
+    // Download avatar (prefer syndication URL, fall back to Jina)
+    let avatarMediaId = '';
+    const avatarSrc = syndication?.user?.profile_image_url_https?.replace('_normal.', '_bigger.')
+      || jinaTweet.avatarUrl;
+    if (avatarSrc) {
       try {
-        const res = await fetch(tweet.avatarUrl, { signal: AbortSignal.timeout(10_000) });
+        const res = await fetch(avatarSrc, { signal: AbortSignal.timeout(10_000) });
         if (res.ok) {
           const buf = Buffer.from(await res.arrayBuffer());
           const ct = res.headers.get('content-type') || 'image/jpeg';
@@ -349,6 +439,19 @@ export async function extractUrl(url: string): Promise<ExtractionResult> {
       } catch { /* skip */ }
     }
 
+    // Engagement stats: Jina for views/replies/retweets/bookmarks, syndication for likes fallback
+    const likes = jinaTweet.likes !== '0' ? jinaTweet.likes
+      : syndication?.favorite_count != null ? String(syndication.favorite_count) : '0';
+
+    // Tags: include hashtags from syndication entities
+    const tags = ['twitter', 'tweet'];
+    if (handle) tags.push(handle.toLowerCase());
+    if (syndication?.entities?.hashtags) {
+      for (const ht of syndication.entities.hashtags) {
+        tags.push(ht.text.toLowerCase());
+      }
+    }
+
     return {
       text: searchParts.join('\n'),
       title,
@@ -356,21 +459,25 @@ export async function extractUrl(url: string): Promise<ExtractionResult> {
       sourceUrl: trimmedUrl,
       contentType: 'tweet',
       category: 'tweet',
-      tags: ['twitter', 'tweet', ...(tweet.handle ? [tweet.handle.toLowerCase()] : [])],
+      tags,
       localizedImages,
       metadata: {
         url: trimmedUrl,
-        tweetId: tweetIdMatch?.[1] || '',
-        authorName: tweet.authorName,
-        handle: tweet.handle,
+        tweetId,
+        authorName,
+        handle,
         avatarUrl: avatarMediaId,
-        verified: 'false',
-        likes: tweet.likes,
-        retweets: tweet.retweets,
-        replies: tweet.replies,
-        views: tweet.views,
-        ...(tweet.engagements ? { engagements: tweet.engagements } : {}),
+        verified: String(verified),
+        createdAt,
+        likes,
+        retweets: jinaTweet.retweets,
+        replies: jinaTweet.replies,
+        bookmarks: jinaTweet.bookmarks,
+        views: jinaTweet.views,
+        ...(jinaTweet.engagements ? { engagements: jinaTweet.engagements } : {}),
         ...(localMediaUrls.length > 0 ? { mediaUrls: localMediaUrls.join(', ') } : {}),
+        ...(mediaTypes.length > 0 ? { mediaTypes: mediaTypes.join(', ') } : {}),
+        ...(videoUrls.some(v => v) ? { videoUrls: videoUrls.join(', ') } : {}),
       },
     };
   }

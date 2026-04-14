@@ -39,7 +39,9 @@ export function SettingsLayout() {
 
       {/* Content */}
       <main className="ml-56 flex-1 min-h-0 pt-8 px-8 overflow-auto">
-        <Outlet />
+        <div className="max-w-3xl mx-auto">
+          <Outlet />
+        </div>
       </main>
     </div>
   );

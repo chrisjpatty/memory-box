@@ -36,14 +36,14 @@ export interface UrlHandler {
 }
 
 import { githubHandler } from './github';
-import { twitterHandler } from './twitter';
 
 /**
  * Registered handlers, checked in order. First match wins.
+ * Note: Twitter is handled directly in extractUrl() via Jina + syndication API
+ * (no auth token required). The twitter.ts handler is still used by bookmark imports.
  */
 const handlers: UrlHandler[] = [
   githubHandler,
-  twitterHandler,
 ];
 
 /**

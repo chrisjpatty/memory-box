@@ -41,30 +41,52 @@ function formatStat(n: string | undefined): string | null {
   return String(num);
 }
 
-function MediaGrid({ urls, hero }: { urls: string[]; hero?: boolean }) {
-  const count = urls.length;
+interface MediaItem {
+  url: string;
+  type: 'photo' | 'video' | 'animated_gif';
+  videoUrl?: string;
+}
+
+function MediaElement({ item, className, hero }: { item: MediaItem; className?: string; hero?: boolean }) {
+  if ((item.type === 'video' || item.type === 'animated_gif') && item.videoUrl) {
+    // Proxy through our server to avoid Twitter CDN blocking browser Referer/Origin
+    const proxiedUrl = `/api/media/video-proxy?url=${encodeURIComponent(item.videoUrl)}`;
+    return (
+      <video
+        src={proxiedUrl}
+        poster={item.url}
+        controls={item.type === 'video'}
+        muted={item.type === 'animated_gif'}
+        autoPlay={item.type === 'animated_gif'}
+        loop={item.type === 'animated_gif'}
+        playsInline
+        className={cn('object-cover w-full h-full', className)}
+      />
+    );
+  }
+  return <img src={item.url} alt="" className={cn('object-cover w-full h-full', className)} />;
+}
+
+function MediaGrid({ items, hero }: { items: MediaItem[]; hero?: boolean }) {
+  const count = items.length;
 
   if (count === 1) {
     return (
       <div className="rounded-xl overflow-hidden border border-neutral-800 mb-2.5">
-        <img
-          src={urls[0]}
-          alt=""
+        <MediaElement
+          item={items[0]}
+          hero={hero}
           className={cn('w-full', hero ? 'max-h-[500px] object-contain' : 'max-h-[200px] object-cover')}
         />
       </div>
     );
   }
 
-  const img = (src: string, className?: string) => (
-    <img src={src} alt="" className={cn('object-cover w-full h-full', className)} />
-  );
-
   if (count === 2) {
     return (
       <div className={cn('grid grid-cols-2 gap-0.5 rounded-xl overflow-hidden border border-neutral-800 mb-2.5', hero ? 'h-[280px]' : 'h-[180px]')}>
-        {img(urls[0])}
-        {img(urls[1])}
+        <MediaElement item={items[0]} />
+        <MediaElement item={items[1]} />
       </div>
     );
   }
@@ -72,9 +94,9 @@ function MediaGrid({ urls, hero }: { urls: string[]; hero?: boolean }) {
   if (count === 3) {
     return (
       <div className={cn('grid grid-cols-2 gap-0.5 rounded-xl overflow-hidden border border-neutral-800 mb-2.5', hero ? 'h-[300px]' : 'h-[200px]')}>
-        <div className="row-span-2">{img(urls[0], 'h-full')}</div>
-        {img(urls[1])}
-        {img(urls[2])}
+        <div className="row-span-2"><MediaElement item={items[0]} className="h-full" /></div>
+        <MediaElement item={items[1]} />
+        <MediaElement item={items[2]} />
       </div>
     );
   }
@@ -82,7 +104,7 @@ function MediaGrid({ urls, hero }: { urls: string[]; hero?: boolean }) {
   // 4+
   return (
     <div className={cn('grid grid-cols-2 grid-rows-2 gap-0.5 rounded-xl overflow-hidden border border-neutral-800 mb-2.5', hero ? 'h-[320px]' : 'h-[220px]')}>
-      {urls.slice(0, 4).map((url, i) => img(url, i === 0 ? '' : ''))}
+      {items.slice(0, 4).map((item, i) => <MediaElement key={i} item={item} />)}
     </div>
   );
 }
@@ -96,8 +118,15 @@ export function TweetCard({ memory, onDelete, variant }: MemoryCardProps) {
   const avatarUrl = rawAvatar.startsWith('/api/') || rawAvatar.startsWith('http') ? rawAvatar : rawAvatar ? `/api/memories/${memory.id}/media/${rawAvatar}` : '';
   const verified = extra.verified === 'true';
   const tweetText = memory.summary || memory.title;
-  const mediaUrls = (extra.mediaUrls || extra.mediaUrl || '').split(',').map((u) => u.trim()).filter(Boolean)
+  const rawMediaUrls = (extra.mediaUrls || extra.mediaUrl || '').split(',').map((u) => u.trim()).filter(Boolean)
     .map((u) => u.startsWith('/api/') || u.startsWith('http') ? u : `/api/memories/${memory.id}/media/${u}`);
+  const rawMediaTypes = (extra.mediaTypes || '').split(',').map((s) => s.trim());
+  const rawVideoUrls = (extra.videoUrls || '').split(',').map((s) => s.trim());
+  const mediaItems: MediaItem[] = rawMediaUrls.map((url, i) => ({
+    url,
+    type: (rawMediaTypes[i] as MediaItem['type']) || 'photo',
+    videoUrl: rawVideoUrls[i] || undefined,
+  }));
 
   const replies = formatStat(extra.replies);
   const retweets = formatStat(extra.retweets);
@@ -138,7 +167,7 @@ export function TweetCard({ memory, onDelete, variant }: MemoryCardProps) {
               </span>
               <span className={cn('text-neutral-700', h ? 'text-sm' : 'text-[12px]')}>&middot;</span>
               <span className={cn('text-neutral-600 shrink-0', h ? 'text-sm' : 'text-[12px]')}>
-                {formatTweetDate(memory.createdAt)}
+                {formatTweetDate(extra.createdAt || memory.createdAt)}
               </span>
               {/* X logo */}
               <XLogo className="text-neutral-700 ml-auto shrink-0" />
@@ -150,8 +179,8 @@ export function TweetCard({ memory, onDelete, variant }: MemoryCardProps) {
             </p>
 
             {/* Attached media */}
-            {mediaUrls.length > 0 && (
-              <MediaGrid urls={mediaUrls} hero={h} />
+            {mediaItems.length > 0 && (
+              <MediaGrid items={mediaItems} hero={h} />
             )}
 
             {/* Engagement stats */}

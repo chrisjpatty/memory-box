@@ -16,7 +16,6 @@ import { chunkText } from './pipeline/chunk';
 import { getEmbeddingProvider } from './pipeline/embed';
 import { checkDuplicate, store } from './pipeline/store';
 import { isTweetUrl } from './pipeline/url-handlers/twitter';
-import { ingestTweet } from './import/ingest-tweet';
 import type { IngestRequest, IngestResult } from './types';
 
 // Re-export for backwards compatibility with existing tests and consumers
@@ -124,32 +123,26 @@ export async function ingest(request: IngestRequest): Promise<IngestResult | Ing
     });
   }
 
-  // Tweet URLs: try direct API ingestion first, fall through to generic URL if no token
+  // Tweet URLs: use Jina + syndication API (no auth token needed).
+  // The Twitter API v2 path (ingestTweet) is still used by bookmark imports.
   if (detectedType === 'url' && isTweetUrl(content)) {
-    try {
-      return await ingestTweet(content);
-    } catch {
-      // No token or API error — fall through to URL pipeline but still mark as tweet.
-      // Use a stub classification instead of LLM (which can't see the tweet content from just a URL).
-      // The extraction step will override title, tags, summary, metadata from the fetched content.
-      const classification = {
-        contentType: 'tweet' as const,
-        title: title || 'Tweet',
-        tags: tags || ['twitter', 'tweet'],
-        category: 'tweet',
-        summary: '',
-        metadata: {},
-      };
-      return ingestContent({
-        content,
-        hash,
-        extract: () => extractUrl(content),
-        initialClassification: classification,
-        userTitle: title,
-        userTags: tags,
-        sourceUrl: content.trim(),
-      });
-    }
+    const classification = {
+      contentType: 'tweet' as const,
+      title: title || 'Tweet',
+      tags: tags || ['twitter', 'tweet'],
+      category: 'tweet',
+      summary: '',
+      metadata: {},
+    };
+    return ingestContent({
+      content,
+      hash,
+      extract: () => extractUrl(content),
+      initialClassification: classification,
+      userTitle: title,
+      userTags: tags,
+      sourceUrl: content.trim(),
+    });
   }
 
   // URLs (single, already detected): classify and extract
