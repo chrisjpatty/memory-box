@@ -537,13 +537,21 @@ export async function extractImage(content: string, userTitle?: string): Promise
   const { detectMimeType } = await import('./detect');
   const originalMimeType = detectMimeType(originalBuffer);
 
-  // Store the image via the media table
+  // Store the image via the media table (for embeddings)
   const img = await storeMedia(originalBuffer, originalMimeType);
+
+  // Determine file extension for the primary file
+  const ext = originalMimeType.includes('png') ? 'png'
+    : originalMimeType.includes('gif') ? 'gif'
+    : originalMimeType.includes('webp') ? 'webp'
+    : 'jpg';
 
   return {
     text: userTitle || 'Image',
     metadata: { mimeType: originalMimeType, mediaId: img.id },
     localizedImages: [img],
+    // Store as the memory's primary file so hasImage works and /image endpoint serves it
+    files: [{ buffer: originalBuffer, filename: `image.${ext}`, contentType: originalMimeType }],
   };
 }
 
