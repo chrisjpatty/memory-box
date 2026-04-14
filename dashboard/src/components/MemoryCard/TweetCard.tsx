@@ -107,7 +107,7 @@ function MediaElement({ item, className, hero }: { item: MediaItem; className?: 
       />
     );
   }
-  return <img src={item.url} alt="" className={cn('object-cover w-full h-full', className)} />;
+  return <img src={item.url} alt="" draggable={false} className={cn('object-cover w-full h-full', className)} />;
 }
 
 function MediaGrid({ items, hero }: { items: MediaItem[]; hero?: boolean }) {
@@ -190,6 +190,7 @@ export function TweetCard({ memory, onDelete, variant }: MemoryCardProps) {
           {/* Avatar */}
           {avatarUrl ? (
             <img
+              draggable={false}
               src={avatarUrl}
               alt=""
               className="w-9 h-9 rounded-full bg-neutral-800 shrink-0 object-cover"

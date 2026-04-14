@@ -13,6 +13,7 @@ export function ImageCard({ memory, onDelete, variant }: MemoryCardProps) {
       <div className="relative aspect-[16/10] bg-neutral-800">
         {memory.hasImage ? (
           <img
+            draggable={false}
             src={memory.imageUrl || `/api/memories/${memory.id}/image`}
             alt={memory.title}
             className="w-full h-full object-cover"

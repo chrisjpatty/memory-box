@@ -74,6 +74,7 @@ function GitHubRepoCard({ memory, onDelete, variant }: MemoryCardProps) {
       {hasImage && (
         <div className="relative aspect-[2.4/1] bg-neutral-800 overflow-hidden">
           <img
+            draggable={false}
             src={extra.readmeImage}
             alt=""
             className="w-full h-full object-cover"

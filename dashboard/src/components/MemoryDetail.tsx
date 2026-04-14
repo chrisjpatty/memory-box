@@ -109,6 +109,7 @@ export function MemoryDetail({ memoryId, onClose, cardData }: Props) {
           <img
             src={`/api/memories/${memoryId}/image`}
             alt={memory.title}
+            draggable={false}
             className="rounded-lg max-w-full max-h-[500px] object-contain"
           />
           <div className="flex flex-wrap gap-2 mt-3">

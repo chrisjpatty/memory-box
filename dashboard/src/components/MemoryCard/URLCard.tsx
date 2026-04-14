@@ -14,7 +14,7 @@ export function URLCard({ memory, onDelete, variant }: MemoryCardProps) {
 
       {imageUrl && (
         <div className="relative aspect-[2.4/1] bg-neutral-800 overflow-hidden">
-          <img src={imageUrl} alt="" className="w-full h-full object-cover" />
+          <img src={imageUrl} alt="" draggable={false} className="w-full h-full object-cover" />
           <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-neutral-900 via-neutral-900/60 to-transparent" />
         </div>
       )}
