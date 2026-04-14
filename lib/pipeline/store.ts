@@ -21,8 +21,8 @@ export interface StoreInput {
   markdown?: string;
   /** Cleaned HTML for iframe rendering */
   html?: string;
-  /** File to store in MinIO */
-  file?: { buffer: Buffer; filename: string; contentType: string };
+  /** Files to store in MinIO (images, media, etc.) */
+  files?: { buffer: Buffer; filename: string; contentType: string }[];
   /** Content hash for dedup */
   contentHash?: string;
 }
@@ -59,7 +59,7 @@ export async function store(input: StoreInput): Promise<StoreResult> {
   const now = new Date().toISOString();
   const {
     content, classification, chunks, embeddings,
-    userTitle, userTags, sourceUrl, markdown, html, file, contentHash,
+    userTitle, userTags, sourceUrl, markdown, html, files, contentHash,
   } = input;
 
   const title = userTitle || classification.title;
@@ -67,13 +67,16 @@ export async function store(input: StoreInput): Promise<StoreResult> {
   const category = classification.category;
   const summary = classification.summary;
 
-  // Store file in MinIO if provided
+  // Store files in MinIO
   let storedFileKey: string | undefined;
   let mimeType: string | undefined;
-  if (file) {
-    storedFileKey = fileKey(id, file.filename);
-    mimeType = file.contentType;
-    await putFile(storedFileKey, file.buffer, file.contentType);
+  if (files?.length) {
+    // First file becomes the primary file_key (used for /image endpoint)
+    storedFileKey = fileKey(id, files[0].filename);
+    mimeType = files[0].contentType;
+    await Promise.all(
+      files.map((f) => putFile(fileKey(id, f.filename), f.buffer, f.contentType)),
+    );
   }
 
   // Store HTML snapshot in MinIO if provided

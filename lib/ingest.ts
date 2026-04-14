@@ -218,7 +218,7 @@ async function ingestContent(args: IngestContentArgs): Promise<IngestResult> {
   let text = content;
   let markdown: string | undefined;
   let html: string | undefined;
-  let file: { buffer: Buffer; filename: string; contentType: string } | undefined;
+  let files: { buffer: Buffer; filename: string; contentType: string }[] | undefined;
   let extractedSourceUrl = sourceUrl;
   let classification = initialClassification;
 
@@ -227,7 +227,7 @@ async function ingestContent(args: IngestContentArgs): Promise<IngestResult> {
     text = extracted.text;
     markdown = text;
     html = extracted.html;
-    file = extracted.file;
+    files = extracted.files;
     extractedSourceUrl = extracted.sourceUrl || extractedSourceUrl;
 
     // Merge extraction metadata into classification
@@ -278,7 +278,7 @@ async function ingestContent(args: IngestContentArgs): Promise<IngestResult> {
     sourceUrl: extractedSourceUrl,
     markdown,
     html,
-    file,
+    files,
     contentHash: hash,
   });
 

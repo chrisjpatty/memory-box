@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { query } from '../../lib/db';
 import { deleteMemory } from '../../lib/pipeline/store';
-import { getFile } from '../../lib/storage';
+import { getFile, fileKey } from '../../lib/storage';
 
 const memories = new Hono();
 
@@ -127,6 +127,27 @@ memories.get('/:id/image', async (c) => {
 
   const file = await getFile(memory.file_key);
   if (!file) return c.json({ error: 'File not found in storage' }, 404);
+
+  return new Response(new Uint8Array(file.data), {
+    headers: {
+      'Content-Type': file.contentType,
+      'Cache-Control': 'public, max-age=31536000, immutable',
+    },
+  });
+});
+
+// Serve a named media file (e.g. tweet images, avatar)
+memories.get('/:id/media/:filename', async (c) => {
+  const id = c.req.param('id');
+  const filename = c.req.param('filename');
+
+  // Sanitize filename to prevent path traversal
+  if (filename.includes('..') || filename.includes('/')) {
+    return c.json({ error: 'Invalid filename' }, 400);
+  }
+
+  const file = await getFile(fileKey(id, filename));
+  if (!file) return c.json({ error: 'File not found' }, 404);
 
   return new Response(new Uint8Array(file.data), {
     headers: {

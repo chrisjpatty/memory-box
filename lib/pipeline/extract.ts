@@ -8,6 +8,7 @@ import sharp from 'sharp';
 import { PDFParse } from 'pdf-parse';
 import { Agent } from '@mastra/core/agent';
 import { tryUrlHandler } from './url-handlers';
+import { isTweetUrl } from './url-handlers/twitter';
 import { resolveRelativeUrls } from './url-utils';
 import type { ClassificationResult } from '../types';
 
@@ -32,8 +33,8 @@ export interface ExtractionResult {
   sourceUrl?: string;
   /** Cleaned HTML for iframe rendering */
   html?: string;
-  /** File to store in MinIO: { buffer, key, contentType } */
-  file?: { buffer: Buffer; filename: string; contentType: string };
+  /** Files to store in MinIO (images, media, etc.) */
+  files?: { buffer: Buffer; filename: string; contentType: string }[];
   /** Extra metadata from extraction */
   metadata?: Record<string, string>;
   /** Extra tags from extraction */
@@ -187,6 +188,75 @@ function firstMarkdownImage(md: string): string | null {
   return match?.[1] || null;
 }
 
+/**
+ * Parse structured tweet fields from Jina Reader markdown.
+ * Jina returns X.com's SSR HTML as markdown with a consistent structure:
+ *   - Author name and handle as linked text
+ *   - Avatar as a profile image
+ *   - Tweet body text
+ *   - Media images as markdown images
+ *   - Engagement stats as bare numbers after the tweet body
+ */
+function parseTweetFromJinaMarkdown(markdown: string, url: string): {
+  tweetText: string;
+  authorName: string;
+  handle: string;
+  avatarUrl: string;
+  mediaUrls: string[];
+  views: string;
+  replies: string;
+  retweets: string;
+  likes: string;
+  bookmarks: string;
+  engagements?: string;
+} {
+  // Author name: first linked text to a user profile after "Conversation"
+  const authorNameMatch = markdown.match(/# Conversation\s+[\s\S]*?\[([^\]]+)\]\(https:\/\/x\.com\/\w+\)\s*\n\s*\[@(\w+)\]/);
+  const authorName = authorNameMatch?.[1] || '';
+  const handle = authorNameMatch?.[2] || '';
+
+  // Avatar: profile image URL from twimg
+  const avatarMatch = markdown.match(/\[!\[Image[^\]]*\]\((https:\/\/pbs\.twimg\.com\/profile_images\/[^)]+)\)/);
+  const avatarUrl = avatarMatch?.[1]?.replace('_normal.', '_bigger.') || '';
+
+  // Tweet text: the paragraph between the handle line and the first image or timestamp
+  const handlePattern = `\\[@${handle || '\\w+'}\\]`;
+  const textMatch = markdown.match(new RegExp(handlePattern + '\\([^)]+\\)\\s*\\n\\n([\\s\\S]*?)(?=\\n\\n\\[!\\[Image|\\n\\n\\[Last edited|\\n\\n\\[\\d)', 'i'));
+  const tweetText = textMatch?.[1]?.trim() || '';
+
+  // Media: all twimg media URLs (not profile images)
+  const mediaUrls: string[] = [];
+  const mediaRegex = /\(https:\/\/pbs\.twimg\.com\/media\/([^)]+)\)/g;
+  let match;
+  while ((match = mediaRegex.exec(markdown)) !== null) {
+    // Upgrade to large format
+    const mediaUrl = `https://pbs.twimg.com/media/${match[1]}`.replace(/name=\w+/, 'name=large');
+    mediaUrls.push(mediaUrl);
+  }
+
+  // Engagement stats: after the views line, X renders bare numbers on separate lines.
+  // The count varies — tweets with zero engagement omit those stats entirely.
+  // Order when present: replies, retweets, likes, bookmarks
+  const viewsMatch = markdown.match(/([\d,]+)\s*Views?\]/i);
+  const statsNums: string[] = [];
+  const afterViews = markdown.match(/\[[\d,]+ Views?\][^\n]*\n([\s\S]*?)(?=\n##|\nRead \d|\n\[Show more)/i);
+  if (afterViews) {
+    const numMatches = afterViews[1].match(/\b(\d[\d,]*)\b/g);
+    if (numMatches) statsNums.push(...numMatches.map((n) => n.replace(/,/g, '')));
+  }
+
+  // If we have all 4 stats, map them to specific fields. Otherwise, sum as engagements.
+  const views = viewsMatch?.[1]?.replace(/,/g, '') || '0';
+  if (statsNums.length >= 4) {
+    return { tweetText, authorName, handle, avatarUrl, mediaUrls, views,
+      replies: statsNums[0], retweets: statsNums[1], likes: statsNums[2], bookmarks: statsNums[3] };
+  }
+  const engagements = statsNums.reduce((sum, n) => sum + parseInt(n, 10), 0);
+  return { tweetText, authorName, handle, avatarUrl, mediaUrls, views,
+    replies: '0', retweets: '0', likes: '0', bookmarks: '0',
+    engagements: String(engagements) };
+}
+
 export async function extractUrl(url: string): Promise<ExtractionResult> {
   const trimmedUrl = url.trim();
 
@@ -210,6 +280,113 @@ export async function extractUrl(url: string): Promise<ExtractionResult> {
   // Generic URL pipeline: Jina Reader → static fallback
   const rawFetched = await fetchViaJina(trimmedUrl) ?? await fetchStatic(trimmedUrl);
   const markdown = resolveRelativeUrls(rawFetched.markdown, trimmedUrl);
+
+  // Tweet URLs via Jina: parse structured fields from the markdown
+  if (isTweetUrl(trimmedUrl)) {
+    const tweet = parseTweetFromJinaMarkdown(markdown, trimmedUrl);
+    const tweetIdMatch = trimmedUrl.match(/\/status\/(\d+)/);
+
+    const cleanText = tweet.tweetText || rawFetched.title || '';
+    const title = tweet.handle
+      ? `@${tweet.handle}: ${cleanText.slice(0, 100)}${cleanText.length > 100 ? '…' : ''}`
+      : rawFetched.title;
+
+    // Build rich search text with all visible context
+    const searchParts = [];
+    if (tweet.authorName) searchParts.push(tweet.authorName);
+    if (tweet.handle) searchParts.push(`@${tweet.handle}`);
+    if (cleanText) searchParts.push(cleanText);
+    const searchText = searchParts.join('\n');
+
+    // Download tweet media and avatar, run media through vision pipeline
+    const files: { buffer: Buffer; filename: string; contentType: string }[] = [];
+    const localMediaUrls: string[] = [];
+    const mediaBuffers: Buffer[] = [];
+
+    // Download media images in parallel
+    const mediaDownloads = tweet.mediaUrls.map(async (url, i) => {
+      try {
+        const res = await fetch(url, { signal: AbortSignal.timeout(15_000) });
+        if (res.ok) {
+          const buf = Buffer.from(await res.arrayBuffer());
+          const ct = res.headers.get('content-type') || 'image/jpeg';
+          const ext = ct.includes('png') ? 'png' : 'jpg';
+          return { buf, ct, ext, i };
+        }
+      } catch { /* skip */ }
+      return null;
+    });
+
+    for (const result of await Promise.all(mediaDownloads)) {
+      if (result) {
+        files.push({ buffer: result.buf, filename: `media-${result.i}.${result.ext}`, contentType: result.ct });
+        localMediaUrls.push(`media-${result.i}.${result.ext}`);
+        mediaBuffers.push(result.buf);
+      }
+    }
+
+    // Download avatar
+    if (tweet.avatarUrl) {
+      try {
+        const res = await fetch(tweet.avatarUrl, { signal: AbortSignal.timeout(10_000) });
+        if (res.ok) {
+          const buf = Buffer.from(await res.arrayBuffer());
+          const ct = res.headers.get('content-type') || 'image/jpeg';
+          files.push({ buffer: buf, filename: 'avatar.jpg', contentType: ct });
+        }
+      } catch { /* skip */ }
+    }
+
+    // Run media images through vision pipeline in parallel for descriptions
+    if (mediaBuffers.length > 0) {
+      const visionResults = await Promise.all(
+        mediaBuffers.map(async (buf) => {
+          try {
+            const vision = await prepareForVision(buf);
+            const response = await getVisionAgent().generate([{
+              role: 'user',
+              content: [
+                { type: 'text', text: 'Describe this image in detail for a personal memory database:' },
+                { type: 'image', image: vision.base64, mimeType: vision.mimeType },
+              ],
+            }]);
+            return response.text || '';
+          } catch {
+            return '';
+          }
+        }),
+      );
+      const descriptions = visionResults.filter(Boolean);
+      if (descriptions.length > 0) {
+        searchParts.push('Images:', ...descriptions);
+      }
+    }
+
+    return {
+      text: searchParts.join('\n'),
+      title,
+      description: cleanText.slice(0, 300),
+      sourceUrl: trimmedUrl,
+      contentType: 'tweet',
+      category: 'tweet',
+      tags: ['twitter', 'tweet', ...(tweet.handle ? [tweet.handle.toLowerCase()] : [])],
+      files: files.length > 0 ? files : undefined,
+      metadata: {
+        url: trimmedUrl,
+        tweetId: tweetIdMatch?.[1] || '',
+        authorName: tweet.authorName,
+        handle: tweet.handle,
+        avatarUrl: tweet.avatarUrl ? 'avatar.jpg' : '',
+        verified: 'false',
+        likes: tweet.likes,
+        retweets: tweet.retweets,
+        replies: tweet.replies,
+        views: tweet.views,
+        ...(tweet.engagements ? { engagements: tweet.engagements } : {}),
+        ...(localMediaUrls.length > 0 ? { mediaUrls: localMediaUrls.join(', ') } : {}),
+      },
+    };
+  }
 
   // Fetch HTML snapshot for iframe rendering (in parallel if Jina was used)
   const htmlSnapshot = 'cleanHtml' in rawFetched
@@ -323,7 +500,7 @@ export async function extractImage(content: string, userTitle?: string): Promise
   return {
     text: description,
     metadata: { mimeType: originalMimeType, imageDescription: description },
-    file: { buffer: originalBuffer, filename: `original.${ext}`, contentType: originalMimeType },
+    files: [{ buffer: originalBuffer, filename: `original.${ext}`, contentType: originalMimeType }],
   };
 }
 
@@ -353,7 +530,7 @@ export async function extractPdf(buffer: Buffer, userTitle?: string): Promise<Ex
     text: extractedText,
     title: userTitle || pdfTitle || undefined,
     metadata: { pageCount: String(pageCount), pdfInfo: pdfTitle },
-    file: { buffer, filename: 'original.pdf', contentType: 'application/pdf' },
+    files: [{ buffer, filename: 'original.pdf', contentType: 'application/pdf' }],
     reclassify: true,
   };
 }

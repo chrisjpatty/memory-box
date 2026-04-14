@@ -92,15 +92,19 @@ export function TweetCard({ memory, onDelete, variant }: MemoryCardProps) {
   const extra = memory.extra || {};
   const authorName = extra.authorName || extra.author || 'Unknown';
   const handle = extra.handle || extra.author || 'user';
-  const avatarUrl = extra.avatarUrl;
+  const rawAvatar = extra.avatarUrl || '';
+  const avatarUrl = rawAvatar.startsWith('http') ? rawAvatar : rawAvatar ? `/api/memories/${memory.id}/media/${rawAvatar}` : '';
   const verified = extra.verified === 'true';
   const tweetText = memory.summary || memory.title;
-  const mediaUrls = (extra.mediaUrls || extra.mediaUrl || '').split(',').map((u) => u.trim()).filter(Boolean);
+  const mediaUrls = (extra.mediaUrls || extra.mediaUrl || '').split(',').map((u) => u.trim()).filter(Boolean)
+    .map((u) => u.startsWith('http') ? u : `/api/memories/${memory.id}/media/${u}`);
 
   const replies = formatStat(extra.replies);
   const retweets = formatStat(extra.retweets);
   const likes = formatStat(extra.likes);
   const views = formatStat(extra.views);
+  const engagements = formatStat(extra.engagements);
+  const hasDetailedStats = !!(replies || retweets || likes);
 
   return (
     <CardShell id={memory.id} onDelete={onDelete} variant={variant}>
@@ -152,41 +156,54 @@ export function TweetCard({ memory, onDelete, variant }: MemoryCardProps) {
 
             {/* Engagement stats */}
             <div className="flex items-center gap-5">
-              {/* Replies */}
-              <div className="flex items-center gap-1.5 text-neutral-600 group/stat">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="group-hover/stat:text-blue-400 transition-colors">
-                  <path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-                {replies && <span className={cn(h ? 'text-sm' : 'text-[11px]')}>{replies}</span>}
-              </div>
+              {hasDetailedStats ? (
+                <>
+                  {/* Replies */}
+                  <div className="flex items-center gap-1.5 text-neutral-600 group/stat">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="group-hover/stat:text-blue-400 transition-colors">
+                      <path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                    {replies && <span className={cn(h ? 'text-sm' : 'text-[11px]')}>{replies}</span>}
+                  </div>
 
-              {/* Retweets */}
-              <div className="flex items-center gap-1.5 text-neutral-600 group/stat">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="group-hover/stat:text-emerald-400 transition-colors">
-                  <path d="M17 1l4 4-4 4" strokeLinecap="round" strokeLinejoin="round" />
-                  <path d="M3 11V9a4 4 0 014-4h14" strokeLinecap="round" strokeLinejoin="round" />
-                  <path d="M7 23l-4-4 4-4" strokeLinecap="round" strokeLinejoin="round" />
-                  <path d="M21 13v2a4 4 0 01-4 4H3" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-                {retweets && <span className={cn(h ? 'text-sm' : 'text-[11px]')}>{retweets}</span>}
-              </div>
+                  {/* Retweets */}
+                  <div className="flex items-center gap-1.5 text-neutral-600 group/stat">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="group-hover/stat:text-emerald-400 transition-colors">
+                      <path d="M17 1l4 4-4 4" strokeLinecap="round" strokeLinejoin="round" />
+                      <path d="M3 11V9a4 4 0 014-4h14" strokeLinecap="round" strokeLinejoin="round" />
+                      <path d="M7 23l-4-4 4-4" strokeLinecap="round" strokeLinejoin="round" />
+                      <path d="M21 13v2a4 4 0 01-4 4H3" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                    {retweets && <span className={cn(h ? 'text-sm' : 'text-[11px]')}>{retweets}</span>}
+                  </div>
 
-              {/* Likes */}
-              <div className="flex items-center gap-1.5 text-neutral-600 group/stat">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="group-hover/stat:text-pink-500 transition-colors">
-                  <path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-                {likes && <span className={cn(h ? 'text-sm' : 'text-[11px]')}>{likes}</span>}
-              </div>
+                  {/* Likes */}
+                  <div className="flex items-center gap-1.5 text-neutral-600 group/stat">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="group-hover/stat:text-pink-500 transition-colors">
+                      <path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                    {likes && <span className={cn(h ? 'text-sm' : 'text-[11px]')}>{likes}</span>}
+                  </div>
+                </>
+              ) : engagements ? (
+                <div className="flex items-center gap-1.5 text-neutral-600">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+                    <path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                  <span className={cn(h ? 'text-sm' : 'text-[11px]')}>{engagements}</span>
+                </div>
+              ) : null}
 
-              {/* Views */}
-              <div className="flex items-center gap-1.5 text-neutral-600 group/stat">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="group-hover/stat:text-blue-400 transition-colors">
-                  <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z" />
-                  <circle cx="12" cy="12" r="3" />
-                </svg>
-                {views && <span className={cn(h ? 'text-sm' : 'text-[11px]')}>{views}</span>}
-              </div>
+              {/* Views — always shown when available */}
+              {views && (
+                <div className="flex items-center gap-1.5 text-neutral-600 group/stat">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="group-hover/stat:text-blue-400 transition-colors">
+                    <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z" />
+                    <circle cx="12" cy="12" r="3" />
+                  </svg>
+                  <span className={cn(h ? 'text-sm' : 'text-[11px]')}>{views}</span>
+                </div>
+              )}
             </div>
           </div>
         </div>
