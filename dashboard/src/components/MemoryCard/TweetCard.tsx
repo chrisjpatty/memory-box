@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { CardShell } from './CardShell';
 import { cn } from '../../lib/cn';
 import type { MemoryCardProps } from './types';
@@ -31,6 +32,48 @@ function formatTweetDate(iso: string): string {
     return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   }
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+/** Truncate a URL for display: show domain + start of path */
+function truncateUrl(url: string, max = 30): string {
+  try {
+    const parsed = new URL(url);
+    const display = parsed.hostname.replace(/^www\./, '') + parsed.pathname;
+    return display.length > max ? display.slice(0, max) + '…' : display;
+  } catch {
+    return url.length > max ? url.slice(0, max) + '…' : url;
+  }
+}
+
+/** Parse text and replace URLs with clickable, visually truncated links */
+function linkifyText(text: string): ReactNode[] {
+  const urlRegex = /(https?:\/\/[^\s]+)/g;
+  const parts: ReactNode[] = [];
+  let lastIndex = 0;
+  let match;
+  while ((match = urlRegex.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      parts.push(text.slice(lastIndex, match.index));
+    }
+    const url = match[1];
+    parts.push(
+      <a
+        key={match.index}
+        href={url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-blue-400 hover:underline"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {truncateUrl(url)}
+      </a>,
+    );
+    lastIndex = match.index + match[0].length;
+  }
+  if (lastIndex < text.length) {
+    parts.push(text.slice(lastIndex));
+  }
+  return parts;
 }
 
 function formatStat(n: string | undefined): string | null {
@@ -117,7 +160,9 @@ export function TweetCard({ memory, onDelete, variant }: MemoryCardProps) {
   const rawAvatar = extra.avatarUrl || '';
   const avatarUrl = rawAvatar.startsWith('/api/') || rawAvatar.startsWith('http') ? rawAvatar : rawAvatar ? `/api/memories/${memory.id}/media/${rawAvatar}` : '';
   const verified = extra.verified === 'true';
-  const tweetText = memory.summary || memory.title;
+  // Prefer summary (has full text with complete URLs) over title (truncated)
+  const tweetText = memory.summary
+    || memory.title.replace(/^@\w+:\s*/, ''); // strip "@handle: " prefix from title fallback
   const rawMediaUrls = (extra.mediaUrls || extra.mediaUrl || '').split(',').map((u) => u.trim()).filter(Boolean)
     .map((u) => u.startsWith('/api/') || u.startsWith('http') ? u : `/api/memories/${memory.id}/media/${u}`);
   const rawMediaTypes = (extra.mediaTypes || '').split(',').map((s) => s.trim());
@@ -175,7 +220,7 @@ export function TweetCard({ memory, onDelete, variant }: MemoryCardProps) {
 
             {/* Tweet body */}
             <p className={cn('text-neutral-300 leading-[1.4] whitespace-pre-line mb-2.5', h ? 'text-base' : 'text-[13px]')}>
-              {tweetText}
+              {linkifyText(tweetText)}
             </p>
 
             {/* Attached media */}

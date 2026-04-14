@@ -57,6 +57,7 @@ interface JinaReaderResponse {
     title?: string;
     description?: string;
     url?: string;
+    metadata?: Record<string, string | string[]>;
   };
 }
 
@@ -64,6 +65,7 @@ async function fetchViaJina(url: string): Promise<{
   markdown: string;
   title: string;
   description: string;
+  ogImage: string;
 } | null> {
   try {
     const headers: Record<string, string> = {
@@ -84,10 +86,15 @@ async function fetchViaJina(url: string): Promise<{
     const json = await response.json() as JinaReaderResponse;
     if (!json.data?.content) return null;
 
+    const meta = json.data.metadata || {};
+    const ogImage = (typeof meta['og:image'] === 'string' ? meta['og:image'] : '')
+      || (typeof meta['twitter:image'] === 'string' ? meta['twitter:image'] : '');
+
     return {
       markdown: json.data.content.slice(0, 100_000),
       title: json.data.title || '',
       description: json.data.description || '',
+      ogImage,
     };
   } catch {
     return null;
@@ -357,10 +364,8 @@ export async function extractUrl(url: string): Promise<ExtractionResult> {
       ? `@${handle}: ${cleanText.replace(/\n+/g, ' ').slice(0, 100)}${cleanText.length > 100 ? '…' : ''}`
       : rawFetched.title;
 
-    // Build rich search text with all visible context
+    // Tweet text is the primary content — author info lives in metadata/title
     const searchParts: string[] = [];
-    if (authorName) searchParts.push(authorName);
-    if (handle) searchParts.push(`@${handle}`);
     if (cleanText) searchParts.push(cleanText);
 
     // Build media lists from syndication (preferred) or Jina thumbnails

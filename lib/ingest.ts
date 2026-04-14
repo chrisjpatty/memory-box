@@ -256,6 +256,9 @@ async function ingestContent(args: IngestContentArgs): Promise<IngestResult> {
     }
   }
 
+  // Discard the classifier's generated summary — use real content instead.
+  classification.summary = text.replace(/^#.*\n/gm, '').trim().slice(0, 300);
+
   // Step 2: Chunk
   const chunks = await chunkText(text, classification.contentType);
 
