@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { useEffect, useRef, useMemo, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import Masonry from 'react-masonry-css';
 import { useInfiniteMemories, useSearch, useDeleteMemory } from '../hooks/queries';
@@ -37,49 +37,42 @@ export function MemoryList({ searchQuery, typeFilters, onCountChange }: MemoryLi
       state: { backgroundLocation: location, cardData: memory },
     });
   }, [location, navigate]);
-  const [searchResults, setSearchResults] = useState<MemoryCardData[] | null>(null);
-  const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
-  const prevQuery = useRef(searchQuery);
 
-  // When a single type is selected, let the API filter; otherwise fetch all and filter client-side
-  const apiType = typeFilters.length === 1 ? typeFilters[0] : undefined;
+  // When a single type is selected and not searching, let the API filter
+  const apiType = !searchQuery && typeFilters.length === 1 ? typeFilters[0] : undefined;
   const infiniteMemories = useInfiniteMemories(apiType);
   const search = useSearch();
   const deleteMemory = useDeleteMemory();
 
-  const isSearching = searchResults !== null;
+  const isSearching = !!searchQuery;
 
-  // React to searchQuery changes from the sidebar
+  // Execute search when searchQuery changes (only changes on explicit submit).
+  // Also fires on mount if URL already has a query.
   useEffect(() => {
-    if (searchQuery === prevQuery.current) return;
-    prevQuery.current = searchQuery;
-
-    if (searchTimeout.current) clearTimeout(searchTimeout.current);
-    searchTimeout.current = setTimeout(() => {
-      const q = searchQuery.trim();
-      if (!q) {
-        setSearchResults(null);
-        return;
-      }
-      search.mutate({ query: q, limit: 50 }, {
-        onSuccess: (r) => setSearchResults(r.results.map(toCardData)),
-      });
-    }, 300);
+    if (searchQuery) {
+      search.mutate({ query: searchQuery, limit: 50 });
+    }
   }, [searchQuery]);
 
-  // Flatten infinite query pages into a single array, applying client-side type filter for multi-select
+  // Flatten results, applying type filters to both search and browse results
   const memories = useMemo(() => {
-    if (isSearching) return searchResults;
+    if (isSearching) {
+      const results = (search.data?.results ?? []).map(toCardData);
+      if (typeFilters.length > 0) {
+        return results.filter((m) => typeFilters.includes(m.contentType));
+      }
+      return results;
+    }
     const all = infiniteMemories.data?.pages.flatMap((p) => p.memories.map(toCardData)) ?? [];
     if (typeFilters.length > 1) {
       return all.filter((m) => typeFilters.includes(m.contentType));
     }
     return all;
-  }, [infiniteMemories.data, searchResults, isSearching, typeFilters]);
+  }, [infiniteMemories.data, search.data, isSearching, typeFilters]);
 
   const total = isSearching
-    ? searchResults.length
+    ? memories.length
     : typeFilters.length > 1
       ? memories.length
       : infiniteMemories.data?.pages[0]?.total ?? 0;

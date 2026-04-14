@@ -10,6 +10,8 @@ import { ImageIcon as Image } from '@phosphor-icons/react/dist/icons/Image';
 import { FilePdfIcon as FilePdf } from '@phosphor-icons/react/dist/icons/FilePdf';
 import { FileIcon as File } from '@phosphor-icons/react/dist/icons/File';
 import { FunnelSimpleIcon as FunnelSimple } from '@phosphor-icons/react/dist/icons/FunnelSimple';
+import { MagnifyingGlassIcon as MagnifyingGlass } from '@phosphor-icons/react/dist/icons/MagnifyingGlass';
+import { XIcon as X } from '@phosphor-icons/react/dist/icons/X';
 
 const typeFilters = [
   { value: 'text', label: 'Text', icon: TextAa },
@@ -23,9 +25,70 @@ const typeFilters = [
 
 export function Memories() {
   const { searchQuery, setSearchQuery, typeFilters: activeTypes, setTypeFilters } = useOutletContext<MemoriesContext>();
-  const [countInfo, setCountInfo] = useState<{ count: number; isSearching: boolean }>({ count: 0, isSearching: false });
+  const [inputValue, setInputValue] = useState(searchQuery);
   const [filterOpen, setFilterOpen] = useState(false);
   const filterRef = useRef<HTMLDivElement>(null);
+  const stickyRef = useRef<HTMLDivElement>(null);
+  const barRef = useRef<HTMLDivElement>(null);
+
+  // Scroll-driven size interpolation with spring-like lerp.
+  // Bypasses React state entirely — sets CSS custom properties on each frame.
+  useEffect(() => {
+    const main = stickyRef.current?.closest('main');
+    if (!main) return;
+
+    const SCROLL_RANGE = 60; // px of scroll to fully shrink
+    const SMOOTHING = 0.15;  // lerp factor per frame
+    let target = 0;
+    let current = 0;
+    let animating = false;
+    let rafId = 0;
+
+    function apply(t: number) {
+      const el = barRef.current;
+      if (!el) return;
+      el.style.setProperty('--bar-h', `${52 - 12 * t}px`);
+      el.style.setProperty('--bar-maxw', `${672 - 96 * t}px`);
+      el.style.setProperty('--bar-fs', `${16 - 2 * t}px`);
+    }
+
+    function tick() {
+      current += (target - current) * SMOOTHING;
+      if (Math.abs(target - current) < 0.005) current = target;
+      apply(current);
+      if (current !== target) {
+        rafId = requestAnimationFrame(tick);
+      } else {
+        animating = false;
+      }
+    }
+
+    function onScroll() {
+      target = Math.min(1, Math.max(0, main!.scrollTop / SCROLL_RANGE));
+      if (!animating) {
+        animating = true;
+        rafId = requestAnimationFrame(tick);
+      }
+    }
+
+    apply(0);
+    main.addEventListener('scroll', onScroll, { passive: true });
+    return () => { main.removeEventListener('scroll', onScroll); cancelAnimationFrame(rafId); };
+  }, []);
+
+  // Sync local input when URL changes externally (e.g. back/forward navigation)
+  useEffect(() => {
+    setInputValue(searchQuery);
+  }, [searchQuery]);
+
+  const submitSearch = () => {
+    setSearchQuery(inputValue.trim());
+  };
+
+  const clearSearch = () => {
+    setInputValue('');
+    setSearchQuery('');
+  };
 
   const toggleType = (value: string) => {
     if (activeTypes.includes(value)) {
@@ -49,20 +112,21 @@ export function Memories() {
 
   return (
     <div>
-      <div className="sticky -top-[26px] z-[16] -mx-8 px-8">
-        <div className="relative flex items-center pt-8 pb-6">
-          <div className="mx-auto w-full max-w-xl flex items-center gap-2">
+      <div ref={stickyRef} className="sticky -top-[26px] z-[16] -mx-8 px-8">
+        <div ref={barRef} className="relative flex items-center pt-8 pb-6">
+          <div style={{ maxWidth: 'var(--bar-maxw)' }} className="mx-auto w-full flex items-center gap-2">
             {/* Filter button */}
             <div className="relative" ref={filterRef}>
               <button
                 onClick={() => setFilterOpen((v) => !v)}
-                className={`flex items-center justify-center shrink-0 w-9 h-9 rounded-lg text-sm transition-colors border ${
+                style={{ width: 'var(--bar-h)', height: 'var(--bar-h)' }}
+                className={`flex items-center justify-center shrink-0 rounded-lg text-sm border-[1.5px] backdrop-blur-xl bg-neutral-950/60 ${
                   activeTypes.length > 0
-                    ? 'bg-neutral-700 text-white border-neutral-600'
-                    : 'bg-neutral-900 text-neutral-400 border-neutral-800 hover:text-neutral-200 hover:border-neutral-600'
+                    ? 'text-white border-neutral-600'
+                    : 'text-neutral-400 border-neutral-600 hover:text-neutral-200'
                 }`}
               >
-                <FunnelSimple size={18} weight="bold" />
+                <FunnelSimple size={20} weight="bold" />
                 {activeTypes.length > 0 && (
                   <span className="text-xs">{activeTypes.length}</span>
                 )}
@@ -107,20 +171,40 @@ export function Memories() {
             </div>
 
             {/* Search bar */}
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search memories..."
-              className="flex-1 h-9 px-3 bg-neutral-900 border border-neutral-800 rounded-lg text-sm text-neutral-200 placeholder-neutral-500 focus:outline-none focus:border-neutral-600 transition-colors"
-            />
+            <form
+              onSubmit={(e) => { e.preventDefault(); submitSearch(); }}
+              className="flex-1 flex items-center gap-0 relative backdrop-blur-xl bg-neutral-950/60 rounded-lg"
+            >
+              <input
+                type="text"
+                value={inputValue}
+                onChange={(e) => setInputValue(e.target.value)}
+                placeholder="Search memories..."
+                style={{ height: 'var(--bar-h)', fontSize: 'var(--bar-fs)' }}
+                className="flex-1 pl-4 pr-10 bg-transparent border-[1.5px] border-neutral-600 border-r-0 rounded-l-lg text-neutral-200 placeholder-neutral-500 focus:outline-none"
+              />
+              {inputValue && (
+                <button
+                  type="button"
+                  onClick={clearSearch}
+                  style={{ right: 'var(--bar-h)' }}
+                  className="absolute text-neutral-500 hover:text-neutral-300"
+                >
+                  <X size={15} />
+                </button>
+              )}
+              <button
+                type="submit"
+                style={{ width: 'var(--bar-h)', height: 'var(--bar-h)' }}
+                className="flex items-center justify-center shrink-0 rounded-r-lg border-[1.5px] border-neutral-600 border-l-0 text-neutral-400 hover:text-neutral-200"
+              >
+                <MagnifyingGlass size={18} weight="bold" />
+              </button>
+            </form>
           </div>
-          <span className="absolute right-0 text-xs text-neutral-500">
-            {countInfo.count} {countInfo.isSearching ? 'results' : 'total'}
-          </span>
         </div>
       </div>
-      <MemoryList searchQuery={searchQuery} typeFilters={activeTypes} onCountChange={(count, isSearching) => setCountInfo({ count, isSearching })} />
+      <MemoryList searchQuery={searchQuery} typeFilters={activeTypes} />
     </div>
   );
 }
