@@ -4,7 +4,6 @@
  */
 import * as cheerio from 'cheerio';
 import TurndownService from 'turndown';
-import { PDFParse } from 'pdf-parse';
 import { tryUrlHandler } from './url-handlers';
 import { isTweetUrl } from './url-handlers/twitter';
 import { fetchTweetSyndication, buildCleanTweetText, bestVideoUrl } from './url-handlers/twitter-syndication';
@@ -565,33 +564,3 @@ export async function extractImage(content: string, userTitle?: string): Promise
   };
 }
 
-// --- PDF Extraction ---
-
-export async function extractPdf(buffer: Buffer, userTitle?: string): Promise<ExtractionResult> {
-  const parser = new PDFParse({ data: buffer });
-  const textResult = await parser.getText();
-  const extractedText = textResult.text?.trim();
-
-  if (!extractedText) {
-    await parser.destroy();
-    throw new Error('PDF contained no extractable text');
-  }
-
-  let pageCount = textResult.total || 0;
-  let pdfTitle = '';
-  try {
-    const info = await parser.getInfo();
-    pageCount = info.total || pageCount;
-    pdfTitle = info.info?.Title || '';
-  } catch { /* best-effort */ }
-
-  await parser.destroy();
-
-  return {
-    text: extractedText,
-    title: userTitle || pdfTitle || undefined,
-    metadata: { pageCount: String(pageCount), pdfInfo: pdfTitle },
-    files: [{ buffer, filename: 'original.pdf', contentType: 'application/pdf' }],
-    reclassify: true,
-  };
-}

@@ -5,6 +5,9 @@ import { Streamdown } from 'streamdown';
 import 'streamdown/styles.css';
 import type { Message, ToolCallPart } from '../hooks/useChat';
 import { MemoryCard, type MemoryCardData } from './MemoryCard';
+import { PaperPlaneTiltIcon as PaperPlaneTilt } from '@phosphor-icons/react/dist/icons/PaperPlaneTilt';
+import { ArrowDownIcon as ArrowDown } from '@phosphor-icons/react/dist/icons/ArrowDown';
+import { ChatCircleIcon as ChatCircle } from '@phosphor-icons/react/dist/icons/ChatCircle';
 
 function getToolLabel(toolName: string, args: Record<string, unknown>): { action: string; past: string; detail?: string } {
   switch (toolName) {
@@ -246,6 +249,13 @@ function DisplayedMemories({ tools }: { tools: ToolCallPart[] }) {
   );
 }
 
+const SUGGESTIONS = [
+  'What have I saved recently?',
+  'What are my most common topics?',
+  'Summarize my saved articles',
+  'Show me something I forgot about',
+];
+
 interface ThreadProps {
   messages: Message[];
   isLoading: boolean;
@@ -316,10 +326,21 @@ export function Thread({ messages, isLoading, isStreaming, onSend }: ThreadProps
             </div>
           ) : (
           <div className="flex flex-col items-center justify-center min-h-[calc(100vh-11rem)] text-center px-4">
-            <h1 className="text-2xl font-bold mb-2">Memory Box</h1>
-            <p className="text-neutral-500 text-sm max-w-md">
-              Search your memories with natural language. Ask a question or describe what you're looking for.
+            <ChatCircle size={40} weight="bold" className="text-neutral-700 mb-6" />
+            <p className="text-neutral-500 text-sm mb-8">
+              Ask anything about your memories
             </p>
+            <div className="flex flex-wrap gap-2 justify-center max-w-md">
+              {SUGGESTIONS.map((s) => (
+                <button
+                  key={s}
+                  onClick={() => onSend(s)}
+                  className="px-3 py-1.5 rounded-full text-xs font-medium border border-neutral-800 text-neutral-500 hover:text-neutral-300 hover:border-neutral-600 transition-colors"
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
           </div>
           )
         ) : (
@@ -429,23 +450,21 @@ export function Thread({ messages, isLoading, isStreaming, onSend }: ThreadProps
             isSticky.current = true;
             setShowScrollButton(false);
           }}
-          className="fixed bottom-20 left-56 right-0 mx-auto w-8 h-8 flex items-center justify-center rounded-full bg-neutral-800 border border-neutral-700 text-neutral-400 hover:text-neutral-200 hover:bg-neutral-700 transition-colors z-20 cursor-pointer shadow-lg"
+          className="fixed bottom-20 left-0 md:left-56 right-0 mx-auto w-8 h-8 flex items-center justify-center rounded-full backdrop-blur-xl bg-neutral-950/60 border border-neutral-700 text-neutral-400 hover:text-neutral-200 transition-colors z-20 cursor-pointer shadow-lg"
         >
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
-            <path fillRule="evenodd" d="M10 3a.75.75 0 0 1 .75.75v10.638l3.96-4.158a.75.75 0 1 1 1.08 1.04l-5.25 5.513a.75.75 0 0 1-1.08 0l-5.25-5.512a.75.75 0 0 1 1.08-1.04l3.96 4.157V3.75A.75.75 0 0 1 10 3Z" clipRule="evenodd" />
-          </svg>
+          <ArrowDown size={16} weight="bold" />
         </button>
       )}
-      <div className="fixed bottom-0 left-56 right-0 px-8 z-10 bg-neutral-950 before:content-[''] before:absolute before:inset-x-0 before:bottom-[calc(100%-0.75rem)] before:h-10 before:bg-gradient-to-t before:from-neutral-950/80 before:to-transparent before:pointer-events-none">
+      <div className="fixed bottom-0 left-0 md:left-56 right-0 px-4 md:px-8 z-10 bg-neutral-950 before:content-[''] before:absolute before:inset-x-0 before:bottom-[calc(100%-0.75rem)] before:h-10 before:bg-gradient-to-t before:from-neutral-950/80 before:to-transparent before:pointer-events-none">
         <div className="max-w-[788px] mx-auto w-full pb-4 px-4">
-        <div className="relative flex items-end bg-neutral-900 border border-neutral-800 rounded-xl focus-within:border-neutral-600 transition-colors">
+        <div className="relative flex items-end backdrop-blur-xl bg-neutral-950/60 border-[1.5px] border-neutral-600 rounded-xl focus-within:border-neutral-500 transition-colors">
           <textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Ask about your memories..."
             autoFocus
-            className="flex-1 px-4 py-3 bg-transparent text-sm text-neutral-200 placeholder-neutral-600 focus:outline-none resize-none max-h-40"
+            className="flex-1 px-4 py-3 bg-transparent text-sm text-neutral-200 placeholder-neutral-500 focus:outline-none resize-none max-h-40"
             rows={1}
           />
           <button
@@ -453,9 +472,7 @@ export function Thread({ messages, isLoading, isStreaming, onSend }: ThreadProps
             disabled={!input.trim() || isStreaming}
             className="p-2 mr-1 mb-1 text-neutral-400 hover:text-neutral-200 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5">
-              <path d="M3.105 2.288a.75.75 0 0 0-.826.95l1.414 4.926A1.5 1.5 0 0 0 5.135 9.25h6.115a.75.75 0 0 1 0 1.5H5.135a1.5 1.5 0 0 0-1.442 1.086l-1.414 4.926a.75.75 0 0 0 .826.95 28.897 28.897 0 0 0 15.293-7.155.75.75 0 0 0 0-1.114A28.897 28.897 0 0 0 3.105 2.288Z" />
-            </svg>
+            <PaperPlaneTilt size={20} weight="bold" />
           </button>
         </div>
         </div>

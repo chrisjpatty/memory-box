@@ -61,7 +61,7 @@ export function DangerZone() {
               value={confirmText}
               onChange={(e) => setConfirmText(e.target.value)}
               placeholder={confirmPhrase}
-              className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-4 py-2 text-sm text-neutral-200 placeholder-neutral-700 focus:outline-none focus:border-red-800"
+              className="w-full bg-neutral-950 border-[1.5px] border-neutral-600 rounded-lg px-4 py-2 text-sm text-neutral-200 placeholder-neutral-700 focus:outline-none focus:border-red-800"
             />
           </div>
           <button

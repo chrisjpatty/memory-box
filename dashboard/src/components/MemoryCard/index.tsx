@@ -4,7 +4,6 @@ import { URLCard } from './URLCard';
 import { ImageCard } from './ImageCard';
 import { GitHubCard } from './GitHubCard';
 import { TweetCard } from './TweetCard';
-import { PDFCard } from './PDFCard';
 import { FileCard } from './FileCard';
 
 export type { MemoryCardData, MemoryCardProps };
@@ -22,8 +21,6 @@ export function MemoryCard({ memory, onDelete, variant }: MemoryCardProps) {
       return <URLCard {...props} />;
     case 'image':
       return <ImageCard {...props} />;
-    case 'pdf':
-      return <PDFCard {...props} />;
     case 'file':
       return <FileCard {...props} />;
     case 'text':

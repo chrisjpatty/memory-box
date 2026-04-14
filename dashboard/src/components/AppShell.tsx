@@ -4,7 +4,12 @@ import { ChatCircleIcon as ChatCircle } from '@phosphor-icons/react/dist/icons/C
 import { CubeIcon as Cube } from '@phosphor-icons/react/dist/icons/Cube';
 import { GearSixIcon as GearSix } from '@phosphor-icons/react/dist/icons/GearSix';
 import { PlusIcon as Plus } from '@phosphor-icons/react/dist/icons/Plus';
+import { ListIcon as List } from '@phosphor-icons/react/dist/icons/List';
+import { CaretDownIcon as CaretDown } from '@phosphor-icons/react/dist/icons/CaretDown';
 import type { IconProps } from '@phosphor-icons/react';
+import { MobileDrawer } from './MobileDrawer';
+import { ChatNavList } from './ChatSidebar';
+import { SettingsNav } from '../pages/settings/SettingsLayout';
 
 const modes: { to: string; label: string; icon: ComponentType<IconProps>; activeColor: string }[] = [
   { to: '/chat', label: 'Chat', icon: ChatCircle, activeColor: 'text-blue-200' },
@@ -25,7 +30,15 @@ export function AppShell() {
   const navigate = useNavigate();
   const isMemories = pathname.startsWith('/memories');
   const isChat = pathname.startsWith('/chat');
+  const isSettings = pathname.startsWith('/settings');
   const showOverlay = isMemories || isChat;
+
+  // Mobile header label
+  const activeModeIdx = getNavIndex(pathname);
+  const activeModeMobile = activeModeIdx >= 0 && activeModeIdx < modes.length ? modes[activeModeIdx] : null;
+  const mobileLabel = activeModeMobile?.label ?? (pathname.startsWith('/import') ? 'Import' : '');
+  const mobileActiveColor = activeModeMobile?.activeColor ?? (pathname.startsWith('/import') ? 'text-white' : 'text-neutral-200');
+  const MobileActiveIcon = activeModeMobile?.icon ?? (pathname.startsWith('/import') ? Plus : null);
 
   const navRef = useRef<HTMLElement>(null);
   const linkRefs = useRef<(HTMLAnchorElement | null)[]>([]);
@@ -33,6 +46,17 @@ export function AppShell() {
   const [navOffset, setNavOffset] = useState(0);
 
   const activeIndex = getNavIndex(pathname);
+
+  // Mobile accordion state — defaults to current section, syncs on route change
+  const [expandedSection, setExpandedSection] = useState<string | null>(
+    isChat ? 'chat' : isSettings ? 'settings' : null,
+  );
+  useEffect(() => {
+    setExpandedSection(isChat ? 'chat' : isSettings ? 'settings' : null);
+  }, [isChat, isSettings]);
+  const toggleSection = (section: string) => {
+    setExpandedSection((prev) => (prev === section ? null : section));
+  };
 
   const computeOffset = useCallback(() => {
     const nav = navRef.current;
@@ -93,9 +117,87 @@ export function AppShell() {
       )}
 
       <header className="fixed top-0 left-0 right-0 h-14 flex items-center px-6 z-20">
+        {/* Mobile hamburger + drawer */}
+        <div className="md:hidden">
+          <MobileDrawer
+            trigger={
+              <button className="flex items-center gap-3">
+                <List size={24} weight="bold" className="text-neutral-400" />
+                <span className={`flex items-center gap-2 text-lg font-semibold tracking-tight ${mobileActiveColor}`}>
+                  {MobileActiveIcon && <MobileActiveIcon size={18} weight="bold" />}
+                  {mobileLabel}
+                </span>
+              </button>
+            }
+          >
+            <div className="p-4 flex flex-col gap-0.5 overflow-y-auto">
+              {/* Memories — direct link */}
+              <NavLink
+                to="/memories"
+                className={({ isActive }) =>
+                  `flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-base font-semibold tracking-tight transition-colors ${
+                    isActive ? 'text-green-200' : 'text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800/50'
+                  }`
+                }
+              >
+                <Cube size={16} weight="bold" />
+                Memories
+              </NavLink>
+
+              {/* Chat — accordion */}
+              <button
+                onClick={() => toggleSection('chat')}
+                className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-base font-semibold tracking-tight transition-colors w-full ${
+                  isChat ? 'text-blue-200' : 'text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800/50'
+                }`}
+              >
+                <ChatCircle size={16} weight="bold" />
+                <span className="flex-1 text-left">Chat</span>
+                <CaretDown size={12} weight="bold" className={`transition-transform ${expandedSection === 'chat' ? 'rotate-180' : ''}`} />
+              </button>
+              {expandedSection === 'chat' && (
+                <div className="ml-5 pl-3 border-l border-neutral-800">
+                  <ChatNavList />
+                </div>
+              )}
+
+              {/* Settings — accordion */}
+              <button
+                onClick={() => toggleSection('settings')}
+                className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-base font-semibold tracking-tight transition-colors w-full ${
+                  isSettings ? 'text-neutral-200' : 'text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800/50'
+                }`}
+              >
+                <GearSix size={16} weight="bold" />
+                <span className="flex-1 text-left">Settings</span>
+                <CaretDown size={12} weight="bold" className={`transition-transform ${expandedSection === 'settings' ? 'rotate-180' : ''}`} />
+              </button>
+              {expandedSection === 'settings' && (
+                <div className="ml-5 pl-3 border-l border-neutral-800">
+                  <SettingsNav />
+                </div>
+              )}
+
+              {/* Import — direct link */}
+              <NavLink
+                to="/import"
+                className={({ isActive }) =>
+                  `flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-base font-semibold tracking-tight transition-colors ${
+                    isActive ? 'text-white' : 'text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800/50'
+                  }`
+                }
+              >
+                <Plus size={16} weight="bold" />
+                Import
+              </NavLink>
+            </div>
+          </MobileDrawer>
+        </div>
+
+        {/* Desktop nav */}
         <nav
           ref={navRef}
-          className="absolute left-1/2 flex items-center gap-6"
+          className="hidden md:flex absolute left-1/2 items-center gap-6"
           style={{
             transform: `translateX(calc(-50% + ${navOffset}px))`,
             transition: 'transform 330ms cubic-bezier(0.15, 0, 0.35, 1)',
@@ -128,7 +230,7 @@ export function AppShell() {
             );
           })}
         </nav>
-        <div className="ml-auto">
+        <div className="hidden md:block ml-auto">
           <NavLink
             to="/import"
             onClick={(e) => handleNavTransition(e, '/import', IMPORT_INDEX)}

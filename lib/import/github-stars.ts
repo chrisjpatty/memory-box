@@ -1,7 +1,7 @@
 import { query } from '../db';
 import { githubFetch, githubHeaders } from '../pipeline/url-handlers/github';
 import { getGitHubToken } from './token-store';
-import { startSchedule, stopSchedule, isScheduleRunning } from '../jobs/scheduler';
+import { startCronSync, stopCronSync, getCronSyncSchedule } from '../jobs/cron';
 
 /** Parse GitHub Link header to find the "next" page URL. */
 function parseLinkNext(linkHeader: string | null): string | null {
@@ -113,24 +113,14 @@ export async function discoverStars(username: string, token?: string): Promise<D
   };
 }
 
-// --- Auto-Sync (delegates to job scheduler) ---
-
-const SYNC_INTERVAL_MS = 15 * 60 * 1000; // 15 minutes
-
-export async function startAutoSync(): Promise<void> {
-  await startSchedule('github-sync');
-}
-
-export async function stopAutoSync(): Promise<void> {
-  await stopSchedule('github-sync');
-}
+// --- Auto-Sync (delegates to Bun.cron) ---
 
 export async function enableAutoSync(): Promise<void> {
   await query(
     `INSERT INTO settings (key, value) VALUES ('github_sync_enabled', 'true')
      ON CONFLICT (key) DO UPDATE SET value = 'true'`,
   );
-  await startSchedule('github-sync');
+  startCronSync('github-sync');
 }
 
 export async function disableAutoSync(): Promise<void> {
@@ -138,7 +128,7 @@ export async function disableAutoSync(): Promise<void> {
     `INSERT INTO settings (key, value) VALUES ('github_sync_enabled', 'false')
      ON CONFLICT (key) DO UPDATE SET value = 'false'`,
   );
-  await stopSchedule('github-sync');
+  stopCronSync('github-sync');
 }
 
 export async function getSyncStatus(): Promise<{
@@ -157,9 +147,10 @@ export async function getSyncStatus(): Promise<{
   const lastCheck = lastCheckResult.rows[0]?.value || undefined;
 
   let nextCheck: string | undefined;
-  if (enabled && lastCheck) {
-    const next = new Date(new Date(lastCheck).getTime() + SYNC_INTERVAL_MS);
-    nextCheck = next.toISOString();
+  const schedule = getCronSyncSchedule('github-sync');
+  if (enabled && schedule) {
+    const next = Bun.cron.parse(schedule);
+    if (next) nextCheck = next.toISOString();
   }
 
   return { enabled, lastCheck, nextCheck };

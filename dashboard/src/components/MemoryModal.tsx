@@ -93,7 +93,7 @@ export function MemoryModal() {
       {/* Dialog panel — only mounts once content is ready so slide-up has final height */}
       {!isLoading && (
         <div className="fixed inset-0 z-50 overflow-y-auto animate-[modal-slide-up_400ms_cubic-bezier(0.16,1,0.3,1)]">
-          <div className="flex min-h-full items-center justify-center pt-16 pb-8 px-4">
+          <div className="flex min-h-full items-center justify-center pt-14 md:pt-16 pb-4 md:pb-8 px-3 md:px-4">
           <div
             className="relative w-full max-w-3xl pointer-events-auto"
             onClick={(e) => e.stopPropagation()}

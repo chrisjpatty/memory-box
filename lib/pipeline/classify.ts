@@ -15,7 +15,7 @@ import type { ClassificationResult, ClassifyOutput, ContentType } from '../types
 const classificationSchema = z.object({
   mode: z.enum(['single', 'multiple']).default('single'),
   // Single mode fields — populated when mode is 'single'
-  contentType: z.enum(['text', 'url', 'image', 'pdf', 'file']).default('text'),
+  contentType: z.enum(['text', 'url', 'image', 'file']).default('text'),
   title: z.string().default('').describe('A concise, descriptive title for this content'),
   tags: z.preprocess(
     (val) => {
@@ -140,13 +140,11 @@ export function fallbackClassify(
   } catch { /* not a URL */ }
 
   if (content.startsWith('data:image/')) contentType = 'image';
-  if (content.startsWith('data:application/pdf')) contentType = 'pdf';
-
   return {
     contentType,
     title: userTitle || content.slice(0, 80),
     tags: userTags || [],
-    category: contentType === 'url' ? 'bookmark' : contentType === 'pdf' ? 'document' : 'note',
+    category: contentType === 'url' ? 'bookmark' : 'note',
     summary: content.slice(0, 200),
     metadata: {},
   };

@@ -73,7 +73,7 @@ export function MemoryDetail({ memoryId, onClose, cardData }: Props) {
       </div>
 
       {/* Content area -- padded when in modal */}
-      <div className={inModal ? 'p-6' : ''}>
+      <div className={inModal ? 'p-4 md:p-6' : ''}>
 
       {isLoading && (
         <div className="text-neutral-500 text-sm py-4 text-center">Loading details...</div>
@@ -85,7 +85,7 @@ export function MemoryDetail({ memoryId, onClose, cardData }: Props) {
           href={memory.source}
           target="_blank"
           rel="noopener noreferrer"
-          className="flex items-center gap-3 mb-6 px-4 py-3 bg-neutral-900 border border-neutral-800 rounded-xl hover:border-neutral-700 transition-colors group"
+          className="flex items-center gap-3 mb-4 md:mb-6 px-3 py-2.5 md:px-4 md:py-3 bg-neutral-900 border border-neutral-800 rounded-xl hover:border-neutral-700 transition-colors group"
         >
           <div className="w-8 h-8 rounded-lg bg-neutral-800 flex items-center justify-center shrink-0 group-hover:bg-neutral-750">
             <svg width="14" height="14" viewBox="0 0 12 12" fill="none" className="text-neutral-400">
@@ -105,13 +105,13 @@ export function MemoryDetail({ memoryId, onClose, cardData }: Props) {
 
       {/* Image */}
       {memory && memory.hasImage && (
-        <div className="bg-neutral-900 border border-neutral-800 rounded-xl p-6 mb-6">
+        <div className="bg-neutral-900 border border-neutral-800 rounded-xl p-4 md:p-6 mb-4 md:mb-6">
           <img
             src={`/api/memories/${memoryId}/image`}
             alt={memory.title}
             className="rounded-lg max-w-full max-h-[500px] object-contain"
           />
-          <div className="flex gap-2 mt-3">
+          <div className="flex flex-wrap gap-2 mt-3">
             <ActionButton
               label="Copy"
               onClick={async () => {
@@ -135,12 +135,12 @@ export function MemoryDetail({ memoryId, onClose, cardData }: Props) {
 
       {/* Full content */}
       {content && (
-        <div className="bg-neutral-900 border border-neutral-800 rounded-xl p-6">
-          <div className="flex items-center justify-between mb-3">
+        <div className="bg-neutral-900 border border-neutral-800 rounded-xl p-4 md:p-6">
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
             <h3 className="text-xs font-semibold uppercase tracking-wider text-neutral-500">
               {memory?.hasImage ? 'Description' : 'Content'}
             </h3>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <ActionButton
                 label="Copy"
                 onClick={() => navigator.clipboard.writeText(rawContent)}

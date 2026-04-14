@@ -1,4 +1,4 @@
-export type ContentType = 'text' | 'url' | 'image' | 'pdf' | 'file' | 'tweet' | 'github';
+export type ContentType = 'text' | 'url' | 'image' | 'file' | 'tweet' | 'github';
 
 export interface MemoryCardData {
   id: string;

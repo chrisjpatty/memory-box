@@ -313,12 +313,11 @@ export async function cleanupExpired(): Promise<void> {
   await query('DELETE FROM oauth_refresh_tokens WHERE revoked = true OR expires_at < NOW()');
 }
 
-let cleanupInterval: ReturnType<typeof setInterval> | null = null;
+let cleanupCron: { stop(): unknown; cron: string } | null = null;
 
 export function startCleanupJob(): void {
-  if (cleanupInterval) return;
-  // Clean up every 5 minutes
-  cleanupInterval = setInterval(() => {
-    cleanupExpired().catch((err) => console.error('OAuth cleanup error:', err));
-  }, 5 * 60 * 1000);
+  if (cleanupCron) return;
+  cleanupCron = Bun.cron('*/5 * * * *', () =>
+    cleanupExpired().catch((err) => console.error('OAuth cleanup error:', err)),
+  );
 }

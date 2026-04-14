@@ -13,12 +13,6 @@ describe('fallbackClassify', () => {
     expect(result.contentType).toBe('image');
   });
 
-  test('PDF data URI → pdf type, document category', () => {
-    const result = fallbackClassify('data:application/pdf;base64,JVBERi0=');
-    expect(result.contentType).toBe('pdf');
-    expect(result.category).toBe('document');
-  });
-
   test('plain text → text type, note category', () => {
     const result = fallbackClassify('Just some regular notes about things');
     expect(result.contentType).toBe('text');

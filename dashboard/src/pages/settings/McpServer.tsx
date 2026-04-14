@@ -1,10 +1,25 @@
 import { useState, useEffect, useRef } from 'react';
+
 import { useMcpStatus, useEnableMcp, useDisableMcp } from '../../hooks/queries';
+import { CopySimpleIcon as CopySimple } from '@phosphor-icons/react/dist/icons/CopySimple';
+import { CheckIcon as Check } from '@phosphor-icons/react/dist/icons/Check';
+import { PlugsIcon as Plugs } from '@phosphor-icons/react/dist/icons/Plugs';
 import Prism from 'prismjs';
 import 'prismjs/components/prism-json';
 import 'prismjs/themes/prism-tomorrow.css';
 
 type ConfigTab = 'claude-web' | 'claude-desktop' | 'vscode' | 'generic';
+
+const mcpTools = [
+  { name: 'membox_store', desc: 'Store text, URLs, or images' },
+  { name: 'membox_search', desc: 'Hybrid semantic + keyword search' },
+  { name: 'membox_get', desc: 'Get a memory by ID' },
+  { name: 'membox_list', desc: 'List memories with filters' },
+  { name: 'membox_delete', desc: 'Delete a memory' },
+  { name: 'membox_graph', desc: 'Explore the knowledge graph' },
+  { name: 'membox_display', desc: 'Render memories as rich cards' },
+  { name: 'membox_ask', desc: 'Chat with the Memory Box agent' },
+];
 
 function McpConfigSnippets({ token, mcpUrl }: { token: string; mcpUrl: string }) {
   const [tab, setTab] = useState<ConfigTab>('claude-web');
@@ -79,7 +94,7 @@ function McpConfigSnippets({ token, mcpUrl }: { token: string; mcpUrl: string })
   return (
     <div className="rounded-lg border border-neutral-800 overflow-hidden">
       <div className="flex items-center justify-between bg-neutral-900/80 border-b border-neutral-800 px-1">
-        <div className="flex">
+        <div className="flex overflow-x-auto">
           {tabKeys.map((key) => (
             <button
               key={key}
@@ -96,11 +111,11 @@ function McpConfigSnippets({ token, mcpUrl }: { token: string; mcpUrl: string })
         </div>
         <button
           onClick={handleCopy}
-          className={`mr-2 px-2.5 py-1 rounded text-xs border transition-colors ${
+          className={`mr-2 px-2.5 py-1 rounded text-xs border inline-flex items-center gap-1.5 transition-colors ${
             copied ? 'border-green-600 text-green-400' : 'border-neutral-700 text-neutral-500 hover:text-neutral-300'
           }`}
         >
-          {copied ? 'Copied!' : 'Copy'}
+          {copied ? <><Check size={14} weight="bold" /> Copied!</> : <><CopySimple size={14} weight="bold" /> Copy</>}
         </button>
       </div>
       {active.note && (
@@ -227,11 +242,11 @@ export function McpServer() {
                   <span className="flex-1 break-all text-green-400">{revealedToken}</span>
                   <button
                     onClick={handleCopyToken}
-                    className={`shrink-0 px-2.5 py-1 rounded text-xs border transition-colors ${
+                    className={`shrink-0 px-2.5 py-1 rounded text-xs border inline-flex items-center gap-1.5 transition-colors ${
                       tokenCopied ? 'border-green-600 text-green-400' : 'border-neutral-700 text-neutral-500 hover:text-neutral-300'
                     }`}
                   >
-                    {tokenCopied ? 'Copied!' : 'Copy'}
+                    {tokenCopied ? <><Check size={14} weight="bold" /> Copied!</> : <><CopySimple size={14} weight="bold" /> Copy</>}
                   </button>
                 </div>
                 <p className="mt-2 text-xs text-yellow-400/80">
@@ -271,17 +286,9 @@ export function McpServer() {
             <h3 className="text-sm font-medium text-neutral-200 mb-1">Available Tools</h3>
             <p className="text-xs text-neutral-500 mb-3">These tools are exposed to connected MCP clients.</p>
             <div className="grid gap-2">
-              {[
-                { name: 'membox_store', desc: 'Store text, URLs, or images' },
-                { name: 'membox_search', desc: 'Hybrid semantic + keyword search' },
-                { name: 'membox_get', desc: 'Get a memory by ID' },
-                { name: 'membox_list', desc: 'List memories with filters' },
-                { name: 'membox_delete', desc: 'Delete a memory' },
-                { name: 'membox_graph', desc: 'Explore the knowledge graph' },
-                { name: 'membox_display', desc: 'Render memories as rich cards' },
-                { name: 'membox_ask', desc: 'Chat with the Memory Box agent' },
-              ].map((tool) => (
+              {mcpTools.map((tool) => (
                 <div key={tool.name} className="flex items-center gap-3 bg-neutral-950 border border-neutral-800 rounded-lg px-3 py-2">
+                  <Plugs size={14} weight="bold" className="text-neutral-600 shrink-0" />
                   <code className="text-xs text-neutral-300 font-mono">{tool.name}</code>
                   <span className="text-xs text-neutral-500">{tool.desc}</span>
                 </div>

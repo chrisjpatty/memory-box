@@ -5,6 +5,8 @@ import Prism from 'prismjs';
 import 'prismjs/components/prism-bash';
 import 'prismjs/components/prism-python';
 import 'prismjs/themes/prism-tomorrow.css';
+import { CopySimpleIcon as CopySimple } from '@phosphor-icons/react/dist/icons/CopySimple';
+import { CheckIcon as Check } from '@phosphor-icons/react/dist/icons/Check';
 
 type SnippetLang = 'curl' | 'javascript' | 'python';
 
@@ -92,7 +94,7 @@ requests.post(
   return (
     <div className="rounded-lg border border-neutral-800 overflow-hidden">
       <div className="flex items-center justify-between bg-neutral-900/80 border-b border-neutral-800 px-1">
-        <div className="flex">
+        <div className="flex overflow-x-auto">
           {(['curl', 'javascript', 'python'] as SnippetLang[]).map((lang) => (
             <button
               key={lang}
@@ -109,11 +111,11 @@ requests.post(
         </div>
         <button
           onClick={handleCopy}
-          className={`mr-2 px-2.5 py-1 rounded text-xs border transition-colors ${
+          className={`mr-2 px-2.5 py-1 rounded text-xs border inline-flex items-center gap-1.5 transition-colors ${
             copied ? 'border-green-600 text-green-400' : 'border-neutral-700 text-neutral-500 hover:text-neutral-300'
           }`}
         >
-          {copied ? 'Copied!' : 'Copy'}
+          {copied ? <><Check size={14} weight="bold" /> Copied!</> : <><CopySimple size={14} weight="bold" /> Copy</>}
         </button>
       </div>
       <pre className="!m-0 !rounded-none !bg-neutral-950 p-4 overflow-x-auto">
@@ -180,7 +182,7 @@ function ChangePassword() {
         )}
         <button
           onClick={() => { setSuccess(false); setOpen(true); }}
-          className="px-4 py-2 rounded-lg text-sm font-medium border border-neutral-700 text-neutral-300 hover:text-white hover:border-neutral-500 transition-colors"
+          className="px-4 py-2 rounded-lg text-sm font-medium border-[1.5px] border-neutral-600 text-neutral-300 hover:text-white hover:border-neutral-500 transition-colors"
         >
           Change password
         </button>
@@ -203,7 +205,7 @@ function ChangePassword() {
           placeholder="Current password"
           required
           autoFocus
-          className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-4 py-2 text-sm text-neutral-200 placeholder-neutral-600 focus:outline-none focus:border-neutral-600"
+          className="w-full bg-neutral-950 border-[1.5px] border-neutral-600 rounded-lg px-4 py-2 text-sm text-neutral-200 placeholder-neutral-500 focus:outline-none focus:border-neutral-500"
         />
         <input
           type="password"
@@ -211,7 +213,7 @@ function ChangePassword() {
           onChange={(e) => setNewPassword(e.target.value)}
           placeholder="New password (min 8 characters)"
           required
-          className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-4 py-2 text-sm text-neutral-200 placeholder-neutral-600 focus:outline-none focus:border-neutral-600"
+          className="w-full bg-neutral-950 border-[1.5px] border-neutral-600 rounded-lg px-4 py-2 text-sm text-neutral-200 placeholder-neutral-500 focus:outline-none focus:border-neutral-500"
         />
         <input
           type="password"
@@ -219,7 +221,7 @@ function ChangePassword() {
           onChange={(e) => setConfirmPassword(e.target.value)}
           placeholder="Confirm new password"
           required
-          className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-4 py-2 text-sm text-neutral-200 placeholder-neutral-600 focus:outline-none focus:border-neutral-600"
+          className="w-full bg-neutral-950 border-[1.5px] border-neutral-600 rounded-lg px-4 py-2 text-sm text-neutral-200 placeholder-neutral-500 focus:outline-none focus:border-neutral-500"
         />
       </div>
       <div className="mt-3 flex gap-2">
@@ -282,11 +284,11 @@ export function General() {
           </code>
           <button
             onClick={handleCopyEndpoint}
-            className={`shrink-0 px-3 py-2 rounded-lg text-xs border transition-colors ${
+            className={`shrink-0 px-3 py-2 rounded-lg text-xs border inline-flex items-center gap-1.5 transition-colors ${
               endpointCopied ? 'border-green-600 text-green-400' : 'border-neutral-700 text-neutral-400 hover:text-neutral-200'
             }`}
           >
-            {endpointCopied ? 'Copied!' : 'Copy'}
+            {endpointCopied ? <><Check size={14} weight="bold" /> Copied!</> : <><CopySimple size={14} weight="bold" /> Copy</>}
           </button>
         </div>
       </section>
@@ -302,7 +304,7 @@ export function General() {
         <p className="text-xs text-neutral-500 mb-3">Sign out of your account.</p>
         <button
           onClick={handleLogout}
-          className="px-4 py-2 rounded-lg text-sm font-medium border border-neutral-700 text-neutral-300 hover:text-white hover:border-neutral-500 transition-colors"
+          className="px-4 py-2 rounded-lg text-sm font-medium border-[1.5px] border-neutral-600 text-neutral-300 hover:text-white hover:border-neutral-500 transition-colors"
         >
           Logout
         </button>

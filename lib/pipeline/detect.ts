@@ -15,7 +15,6 @@ export function detectContentType(content: string): ContentType | null {
     if (url.protocol === 'http:' || url.protocol === 'https:') return 'url';
   } catch { /* not a URL */ }
 
-  if (trimmed.startsWith('data:application/pdf;base64,')) return 'pdf';
   if (trimmed.startsWith('data:image/')) return 'image';
 
   return null;
@@ -25,14 +24,12 @@ export function detectContentType(content: string): ContentType | null {
  * Detect content type from a file buffer's magic bytes.
  */
 export function detectFromBuffer(buffer: Buffer, mimeType?: string): ContentType {
-  if (buffer[0] === 0x25 && buffer[1] === 0x50 && buffer[2] === 0x44 && buffer[3] === 0x46) return 'pdf';
   if (buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4e && buffer[3] === 0x47) return 'image';
   if (buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) return 'image';
   if (buffer[0] === 0x47 && buffer[1] === 0x49 && buffer[2] === 0x46) return 'image';
   if (buffer[0] === 0x52 && buffer[1] === 0x49 && buffer[2] === 0x46 && buffer[3] === 0x46) return 'image';
 
   if (mimeType?.startsWith('image/')) return 'image';
-  if (mimeType === 'application/pdf') return 'pdf';
 
   return 'file';
 }
@@ -60,20 +57,6 @@ export function classifyImage(content: string, title?: string, tags?: string[]):
     category: 'image',
     summary: `Uploaded ${extension} image`,
     metadata: { mimeType },
-  };
-}
-
-/**
- * Build classification metadata for PDFs without calling the LLM.
- */
-export function classifyPdf(title?: string, tags?: string[], fileName?: string): ClassificationResult {
-  return {
-    contentType: 'pdf',
-    title: title || fileName || 'PDF Document',
-    tags: tags || ['pdf'],
-    category: 'document',
-    summary: 'Uploaded PDF document',
-    metadata: {},
   };
 }
 

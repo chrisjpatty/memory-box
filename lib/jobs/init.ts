@@ -1,47 +1,24 @@
-import { query } from '../db';
-import { getGitHubToken } from '../import/token-store';
 import { registerJobType } from './registry';
-import { registerSchedule, startSchedule } from './scheduler';
 import { recoverStaleJobs } from './runner';
+import { registerCronSync, startCronSync } from './cron';
 import { githubImportHandler } from './handlers/github-import';
 import { reprocessHandler } from './handlers/reprocess';
 import { githubSyncHandler } from './handlers/github-sync';
 import { twitterImportHandler } from './handlers/twitter-import';
-
-const SYNC_INTERVAL_MS = 15 * 60 * 1000; // 15 minutes
+import { githubSync } from './syncs/github';
 
 export function initJobSystem(): void {
+  // Register job handlers
   registerJobType('github-import', githubImportHandler);
   registerJobType('reprocess', reprocessHandler);
   registerJobType('github-sync', githubSyncHandler);
   registerJobType('twitter-import', twitterImportHandler);
 
-  // Register the auto-sync schedule
-  registerSchedule({
-    type: 'github-sync',
-    intervalMs: SYNC_INTERVAL_MS,
-    async shouldRun() {
-      const enabledResult = await query(
-        `SELECT value FROM settings WHERE key = 'github_sync_enabled'`,
-      );
-      if (enabledResult.rows[0]?.value !== 'true') return false;
+  // Register cron-based syncs
+  registerCronSync(githubSync);
 
-      const token = await getGitHubToken();
-      return !!token;
-    },
-    async payload() {
-      const token = (await getGitHubToken())!;
-      const usernameResult = await query(
-        `SELECT value FROM settings WHERE key = 'github_sync_username'`,
-      );
-      const username = usernameResult.rows[0]?.value;
-      if (!username) throw new Error('No GitHub sync username configured');
-      return { username, token };
-    },
-  });
-
-  // Recover any orphaned jobs from a previous server instance, then start auto-sync
+  // Recover any orphaned jobs from a previous server instance, then start syncs
   recoverStaleJobs()
-    .then(() => startSchedule('github-sync'))
+    .then(() => startCronSync('github-sync'))
     .catch((err) => console.warn('Job system startup failed:', err));
 }

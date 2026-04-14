@@ -3,9 +3,50 @@ import { ingest } from '../../ingest';
 import { githubFetch } from '../../pipeline/url-handlers/github';
 import type { JobHandler } from '../types';
 
+export interface NewStarredRepo {
+  url: string;
+  repo: any;
+}
+
 interface GitHubSyncPayload {
   username: string;
   token: string;
+  newRepos?: NewStarredRepo[];
+}
+
+/**
+ * Lightweight pre-check: fetches recent starred repos and returns only
+ * those not yet imported. Used by the cron tick to decide whether a
+ * full job is needed.
+ */
+export async function findNewStarredRepos(username: string, token: string): Promise<NewStarredRepo[]> {
+  let batch: any;
+  try {
+    batch = await githubFetch(
+      `/users/${username}/starred?per_page=30&sort=created&direction=desc`,
+      token,
+    );
+  } catch (err) {
+    throw new Error(`Failed to fetch starred repos for ${username}: ${(err as Error).message}`);
+  }
+
+  if (!Array.isArray(batch)) {
+    throw new Error(`GitHub API returned unexpected response for ${username}'s stars`);
+  }
+
+  const publicRepos = batch.filter((repo: any) => !repo.private);
+  if (publicRepos.length === 0) return [];
+
+  const urls = publicRepos.map((r: any) => r.html_url);
+  const existing = await query(
+    'SELECT source_url FROM memories WHERE source_url = ANY($1)',
+    [urls],
+  );
+  const importedUrls = new Set(existing.rows.map((r: any) => r.source_url));
+
+  return publicRepos
+    .filter((repo: any) => !importedUrls.has(repo.html_url))
+    .map((repo: any) => ({ url: repo.html_url, repo }));
 }
 
 export const githubSyncHandler: JobHandler<GitHubSyncPayload> = {
@@ -15,35 +56,14 @@ export const githubSyncHandler: JobHandler<GitHubSyncPayload> = {
   async process(payload, ctx) {
     const { username, token } = payload;
 
-    let batch: any;
-    try {
-      batch = await githubFetch(
-        `/users/${username}/starred?per_page=30&sort=created&direction=desc`,
-        token,
-      );
-    } catch (err) {
-      throw new Error(`Failed to fetch starred repos for ${username}: ${(err as Error).message}`);
-    }
+    // Use pre-filtered repos if provided (cron path), otherwise fetch + dedup (manual path)
+    const repos = payload.newRepos ?? await findNewStarredRepos(username, token);
+    await ctx.progress({ total: repos.length });
 
-    if (!Array.isArray(batch)) {
-      throw new Error(`GitHub API returned unexpected response for ${username}'s stars`);
-    }
-
-    const publicRepos = batch.filter((repo: any) => !repo.private);
-    await ctx.progress({ total: publicRepos.length });
-
-    for (const repo of publicRepos) {
+    for (const { url: repoUrl } of repos) {
       if (await ctx.isCancelled()) return;
 
-      const repoUrl = repo.html_url;
       await ctx.progress({ currentItem: repoUrl });
-
-      // Quick dedup check
-      const existing = await query('SELECT id FROM memories WHERE source_url = $1', [repoUrl]);
-      if (existing.rows.length > 0) {
-        await ctx.tickSkipped();
-        continue;
-      }
 
       const originalToken = process.env.GITHUB_TOKEN;
       process.env.GITHUB_TOKEN = token;

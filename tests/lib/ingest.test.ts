@@ -5,7 +5,6 @@ import {
   contentHash,
   bufferHash,
   classifyImage,
-  classifyPdf,
 } from '../../lib/pipeline/detect';
 
 describe('detectContentType', () => {
@@ -23,10 +22,6 @@ describe('detectContentType', () => {
 
   test('non-URL text returns null', () => {
     expect(detectContentType('just some plain text')).toBeNull();
-  });
-
-  test('PDF data URI returns pdf', () => {
-    expect(detectContentType('data:application/pdf;base64,JVBERi0=')).toBe('pdf');
   });
 
   test('image data URI returns image', () => {
@@ -51,11 +46,6 @@ describe('detectContentType', () => {
 });
 
 describe('detectFromBuffer', () => {
-  test('PDF magic bytes → pdf', () => {
-    const buf = Buffer.from([0x25, 0x50, 0x44, 0x46, 0x2d, 0x31]);
-    expect(detectFromBuffer(buf)).toBe('pdf');
-  });
-
   test('PNG magic bytes → image', () => {
     const buf = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a]);
     expect(detectFromBuffer(buf)).toBe('image');
@@ -79,11 +69,6 @@ describe('detectFromBuffer', () => {
   test('unknown bytes + image MIME type → image', () => {
     const buf = Buffer.from([0x00, 0x00, 0x00, 0x00]);
     expect(detectFromBuffer(buf, 'image/svg+xml')).toBe('image');
-  });
-
-  test('unknown bytes + pdf MIME type → pdf', () => {
-    const buf = Buffer.from([0x00, 0x00, 0x00, 0x00]);
-    expect(detectFromBuffer(buf, 'application/pdf')).toBe('pdf');
   });
 
   test('unknown bytes + no MIME → file', () => {
@@ -161,39 +146,3 @@ describe('classifyImage', () => {
   });
 });
 
-describe('classifyPdf', () => {
-  test('uses user title if provided', () => {
-    const result = classifyPdf('My Report');
-    expect(result.title).toBe('My Report');
-  });
-
-  test('falls back to fileName', () => {
-    const result = classifyPdf(undefined, undefined, 'report.pdf');
-    expect(result.title).toBe('report.pdf');
-  });
-
-  test('falls back to default title', () => {
-    const result = classifyPdf();
-    expect(result.title).toBe('PDF Document');
-  });
-
-  test('adds pdf tag by default', () => {
-    const result = classifyPdf();
-    expect(result.tags).toContain('pdf');
-  });
-
-  test('uses user tags when provided', () => {
-    const result = classifyPdf(undefined, ['finance', 'report']);
-    expect(result.tags).toEqual(['finance', 'report']);
-  });
-
-  test('contentType is pdf', () => {
-    const result = classifyPdf();
-    expect(result.contentType).toBe('pdf');
-  });
-
-  test('category is document', () => {
-    const result = classifyPdf();
-    expect(result.category).toBe('document');
-  });
-});

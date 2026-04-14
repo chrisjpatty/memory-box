@@ -7,7 +7,6 @@ import { LinkIcon as LinkIcon } from '@phosphor-icons/react/dist/icons/Link';
 import { TwitterLogoIcon as TwitterLogo } from '@phosphor-icons/react/dist/icons/TwitterLogo';
 import { GithubLogoIcon as GithubLogo } from '@phosphor-icons/react/dist/icons/GithubLogo';
 import { ImageIcon as Image } from '@phosphor-icons/react/dist/icons/Image';
-import { FilePdfIcon as FilePdf } from '@phosphor-icons/react/dist/icons/FilePdf';
 import { FileIcon as File } from '@phosphor-icons/react/dist/icons/File';
 import { FunnelSimpleIcon as FunnelSimple } from '@phosphor-icons/react/dist/icons/FunnelSimple';
 import { MagnifyingGlassIcon as MagnifyingGlass } from '@phosphor-icons/react/dist/icons/MagnifyingGlass';
@@ -19,7 +18,6 @@ const typeFilters = [
   { value: 'tweet', label: 'Tweet', icon: TwitterLogo },
   { value: 'github', label: 'GitHub', icon: GithubLogo },
   { value: 'image', label: 'Image', icon: Image },
-  { value: 'pdf', label: 'PDF', icon: FilePdf },
   { value: 'file', label: 'File', icon: File },
 ];
 
@@ -114,7 +112,7 @@ export function Memories() {
     <div>
       <div ref={stickyRef} className="sticky -top-[26px] z-[16] -mx-8 px-8">
         <div ref={barRef} className="relative flex items-center pt-8 pb-6">
-          <div style={{ maxWidth: 'var(--bar-maxw)' }} className="mx-auto w-full flex items-center gap-2">
+          <div style={{ maxWidth: 'min(var(--bar-maxw), 100%)' }} className="mx-auto w-full flex items-center gap-2">
             {/* Filter button */}
             <div className="relative" ref={filterRef}>
               <button
@@ -173,7 +171,7 @@ export function Memories() {
             {/* Search bar */}
             <form
               onSubmit={(e) => { e.preventDefault(); submitSearch(); }}
-              className="flex-1 flex items-center gap-0 relative backdrop-blur-xl bg-neutral-950/60 rounded-lg"
+              className="flex-1 min-w-0 flex items-center gap-0 relative backdrop-blur-xl bg-neutral-950/60 rounded-lg"
             >
               <input
                 type="text"
@@ -181,7 +179,7 @@ export function Memories() {
                 onChange={(e) => setInputValue(e.target.value)}
                 placeholder="Search memories..."
                 style={{ height: 'var(--bar-h)', fontSize: 'var(--bar-fs)' }}
-                className="flex-1 pl-4 pr-10 bg-transparent border-[1.5px] border-neutral-600 border-r-0 rounded-l-lg text-neutral-200 placeholder-neutral-500 focus:outline-none"
+                className="flex-1 min-w-0 pl-4 pr-10 bg-transparent border-[1.5px] border-neutral-600 border-r-0 rounded-l-lg text-neutral-200 placeholder-neutral-500 focus:outline-none"
               />
               {inputValue && (
                 <button

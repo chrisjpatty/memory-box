@@ -9,8 +9,8 @@
  *
  * Re-exports detection/hashing functions for backwards compatibility with tests.
  */
-import { detectContentType, detectFromBuffer, contentHash, bufferHash, classifyImage, classifyPdf } from './pipeline/detect';
-import { extractUrl, extractImage, extractPdf } from './pipeline/extract';
+import { detectContentType, detectFromBuffer, contentHash, bufferHash, classifyImage } from './pipeline/detect';
+import { extractUrl, extractImage } from './pipeline/extract';
 import { classifyContent } from './pipeline/classify';
 import { chunkText } from './pipeline/chunk';
 import { getEmbeddingProvider } from './pipeline/embed';
@@ -19,7 +19,7 @@ import { isTweetUrl } from './pipeline/url-handlers/twitter';
 import type { IngestRequest, IngestResult } from './types';
 
 // Re-export for backwards compatibility with existing tests and consumers
-export { detectContentType, detectFromBuffer, contentHash, bufferHash, classifyImage, classifyPdf } from './pipeline/detect';
+export { detectContentType, detectFromBuffer, contentHash, bufferHash, classifyImage } from './pipeline/detect';
 export { resolveRelativeUrls } from './pipeline/url-utils';
 export { fallbackClassify } from './pipeline/classify';
 export { detectChunkingStrategy } from './pipeline/chunk';
@@ -45,17 +45,6 @@ export async function ingest(request: IngestRequest): Promise<IngestResult | Ing
     const dupId = await checkDuplicate(hash);
     if (dupId) {
       return { memoryId: dupId, contentType: fileType, title: title || fileName || 'Duplicate', chunks: 0, deduplicated: true, existingMemoryId: dupId };
-    }
-
-    if (fileType === 'pdf') {
-      return ingestContent({
-        content: '',
-        hash,
-        extract: () => extractPdf(fileBuffer, title),
-        initialClassification: classifyPdf(title, tags, fileName),
-        userTitle: title,
-        userTags: tags,
-      });
     }
 
     if (fileType === 'image') {
@@ -95,20 +84,6 @@ export async function ingest(request: IngestRequest): Promise<IngestResult | Ing
   const dupId = await checkDuplicate(hash, urlForDedup);
   if (dupId) {
     return { memoryId: dupId, contentType: detectedType || 'text', title: title || 'Duplicate', chunks: 0, deduplicated: true, existingMemoryId: dupId };
-  }
-
-  // PDFs as base64 data URIs
-  if (detectedType === 'pdf') {
-    const match = content.match(/^data:[^;]+;base64,(.+)$/);
-    const buffer = Buffer.from(match ? match[1] : content, 'base64');
-    return ingestContent({
-      content,
-      hash,
-      extract: () => extractPdf(buffer, title),
-      initialClassification: classifyPdf(title, tags),
-      userTitle: title,
-      userTags: tags,
-    });
   }
 
   // Images: bypass classifier, use Vision

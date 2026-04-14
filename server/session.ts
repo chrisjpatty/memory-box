@@ -4,18 +4,16 @@ import { query } from '../lib/db';
 
 const SESSION_TTL = 86400; // 24 hours in seconds
 const COOKIE_NAME = 'mb_session';
-const CLEANUP_INTERVAL = 3600_000; // 1 hour
-
 // Periodic cleanup of expired sessions
 let cleanupStarted = false;
 function startSessionCleanup() {
   if (cleanupStarted) return;
   cleanupStarted = true;
-  setInterval(async () => {
+  Bun.cron('0 * * * *', async () => {
     try {
       await query('DELETE FROM sessions WHERE expires_at < NOW()');
     } catch { /* non-critical */ }
-  }, CLEANUP_INTERVAL);
+  });
 }
 
 export async function createSession(c: Context): Promise<string> {

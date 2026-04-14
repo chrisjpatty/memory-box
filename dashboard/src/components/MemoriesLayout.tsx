@@ -30,7 +30,7 @@ export function MemoriesLayout() {
 
   return (
     <div className="h-[calc(100vh-3.5rem)] mt-14 overflow-hidden">
-      <main className="h-full px-8 overflow-auto">
+      <main className="h-full px-8 overflow-y-auto overflow-x-hidden">
         <Outlet context={{ searchQuery, typeFilters: activeTypes, setSearchQuery, setTypeFilters: setActiveTypes } satisfies MemoriesContext} />
       </main>
     </div>
