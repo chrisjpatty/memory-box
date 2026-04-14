@@ -1,5 +1,6 @@
-import { useEffect, useRef, useCallback } from 'react';
+import { useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { Drawer } from 'vaul';
 import { useMemory } from '../hooks/queries';
 import { MemoryDetail } from './MemoryDetail';
 
@@ -7,10 +8,8 @@ export function MemoryModal() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const location = useLocation();
-  const modalRef = useRef<HTMLDivElement>(null);
-  const closeButtonRef = useRef<HTMLButtonElement>(null);
-
   const backgroundLocation = location.state?.backgroundLocation;
+  const { isLoading } = useMemory(id ?? '');
 
   const handleClose = useCallback(() => {
     if (backgroundLocation) {
@@ -20,105 +19,56 @@ export function MemoryModal() {
     }
   }, [backgroundLocation, navigate]);
 
-  // Escape key
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') handleClose();
-    };
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [handleClose]);
-
-  // Scroll lock on background
-  useEffect(() => {
-    const scrollables = document.querySelectorAll('main');
-    const originals: string[] = [];
-    scrollables.forEach((el, i) => {
-      originals[i] = (el as HTMLElement).style.overflow;
-      (el as HTMLElement).style.overflow = 'hidden';
-    });
-    return () => {
-      scrollables.forEach((el, i) => {
-        (el as HTMLElement).style.overflow = originals[i] || '';
-      });
-    };
-  }, []);
-
-  // Focus trap
-  useEffect(() => {
-    closeButtonRef.current?.focus();
-
-    const modal = modalRef.current;
-    if (!modal) return;
-
-    const handleTab = (e: KeyboardEvent) => {
-      if (e.key !== 'Tab') return;
-      const focusable = modal.querySelectorAll<HTMLElement>(
-        'a[href], button:not([disabled]), input, textarea, select, [tabindex]:not([tabindex="-1"])'
-      );
-      if (focusable.length === 0) return;
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
-
-      if (e.shiftKey) {
-        if (document.activeElement === first) {
-          e.preventDefault();
-          last.focus();
-        }
-      } else {
-        if (document.activeElement === last) {
-          e.preventDefault();
-          first.focus();
-        }
-      }
-    };
-
-    document.addEventListener('keydown', handleTab);
-    return () => document.removeEventListener('keydown', handleTab);
-  }, []);
-
-  // Wait for full content before showing the dialog to avoid height jumps
-  const { isLoading } = useMemory(id ?? '');
-
   if (!id) return null;
 
   return (
-    <div ref={modalRef} role="dialog" aria-modal="true" aria-label="Memory detail">
-      {/* Backdrop — shows immediately */}
-      <div
-        className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm animate-[modal-backdrop-in_200ms_ease-out]"
-        onClick={handleClose}
-      />
-
-      {/* Dialog panel — only mounts once content is ready so slide-up has final height */}
-      {!isLoading && (
-        <div className="fixed inset-0 z-50 overflow-y-auto animate-[modal-slide-up_400ms_cubic-bezier(0.16,1,0.3,1)]">
-          <div className="flex min-h-full items-center justify-center pt-14 md:pt-16 pb-4 md:pb-8 px-3 md:px-4">
-          <div
-            className="relative w-full max-w-3xl pointer-events-auto"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Close button */}
-            <button
-              ref={closeButtonRef}
-              onClick={handleClose}
-              className="absolute -top-10 right-0 w-8 h-8 flex items-center justify-center rounded-full
-                text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800 transition-colors z-10"
-              aria-label="Close"
-            >
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                <path d="M4 4l8 8M12 4l-8 8" />
-              </svg>
-            </button>
-
-            {/* Content panel */}
-            <div className="bg-neutral-950 border border-neutral-800 rounded-2xl overflow-hidden shadow-2xl">
-              <MemoryDetail memoryId={id} onClose={handleClose} cardData={location.state?.cardData} />
-            </div>
-          </div>
-          </div>
-        </div>
+    <>
+      {/* Backdrop while loading (before drawer mounts) */}
+      {isLoading && (
+        <div
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm animate-[modal-backdrop-in_200ms_ease-out]"
+          onClick={handleClose}
+        />
       )}
-    </div>
+
+      {/* Vaul drawer — the drawer IS the card */}
+      {!isLoading && (
+        <Drawer.Root
+          open
+          onOpenChange={(open) => { if (!open) handleClose(); }}
+        >
+          <Drawer.Portal>
+            <Drawer.Overlay className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm" />
+            <Drawer.Content
+              className="fixed inset-x-0 bottom-0 z-50 mx-auto w-full max-w-3xl flex flex-col rounded-t-2xl bg-neutral-950 border border-neutral-800 border-b-0 shadow-2xl max-h-[96vh] outline-none"
+              aria-describedby={undefined}
+            >
+              <Drawer.Title className="sr-only">Memory detail</Drawer.Title>
+
+              {/* Drag handle + close — absolutely positioned, takes no vertical space */}
+              <div className="absolute top-0 inset-x-0 z-10 pointer-events-none">
+                <div className="flex justify-center pt-3">
+                  <div className="w-10 h-1 rounded-full bg-neutral-500/80" />
+                </div>
+                <button
+                  onClick={handleClose}
+                  className="pointer-events-auto absolute right-4 top-2 w-8 h-8 flex items-center justify-center rounded-full bg-neutral-900/80 backdrop-blur-sm text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800 transition-colors"
+                  aria-label="Close"
+                >
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                    <path d="M4 4l8 8M12 4l-8 8" />
+                  </svg>
+                </button>
+              </div>
+
+              {/* Scrollable content — starts from the very top of the drawer */}
+              <div className="flex-1 overflow-y-auto">
+                <MemoryDetail memoryId={id} onClose={handleClose} cardData={location.state?.cardData} />
+              </div>
+            </Drawer.Content>
+          </Drawer.Portal>
+        </Drawer.Root>
+      )}
+    </>
   );
 }
