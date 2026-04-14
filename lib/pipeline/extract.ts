@@ -10,6 +10,7 @@ import { isTweetUrl } from './url-handlers/twitter';
 import { fetchTweetSyndication, buildCleanTweetText, bestVideoUrl } from './url-handlers/twitter-syndication';
 import { resolveRelativeUrls } from './url-utils';
 import { downloadAndLocalizeImages, storeMedia } from './media';
+import { describeImage } from './vision';
 import type { ClassificationResult } from '../types';
 import type { LocalizedImage } from './media';
 
@@ -540,6 +541,10 @@ export async function extractImage(content: string, userTitle?: string): Promise
   // Store the image via the media table (for embeddings)
   const img = await storeMedia(originalBuffer, originalMimeType);
 
+  // Generate a rich description via Claude Vision
+  const description = await describeImage(originalBuffer);
+  const text = description || userTitle || 'Image';
+
   // Determine file extension for the primary file
   const ext = originalMimeType.includes('png') ? 'png'
     : originalMimeType.includes('gif') ? 'gif'
@@ -547,8 +552,13 @@ export async function extractImage(content: string, userTitle?: string): Promise
     : 'jpg';
 
   return {
-    text: userTitle || 'Image',
-    metadata: { mimeType: originalMimeType, mediaId: img.id },
+    text,
+    title: userTitle || undefined,
+    metadata: {
+      mimeType: originalMimeType,
+      mediaId: img.id,
+      ...(description ? { imageDescription: description } : {}),
+    },
     localizedImages: [img],
     // Store as the memory's primary file so hasImage works and /image endpoint serves it
     files: [{ buffer: originalBuffer, filename: `image.${ext}`, contentType: originalMimeType }],
