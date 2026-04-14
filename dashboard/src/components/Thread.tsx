@@ -266,6 +266,7 @@ interface ThreadProps {
 export function Thread({ messages, isLoading, isStreaming, onSend }: ThreadProps) {
   const [input, setInput] = useState('');
   const bottomRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const isSticky = useRef(true);
   const [showScrollButton, setShowScrollButton] = useState(false);
 
@@ -308,6 +309,13 @@ export function Thread({ messages, isLoading, isStreaming, onSend }: ThreadProps
     setShowScrollButton(false);
     onSend(text);
   };
+
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = el.scrollHeight + 'px';
+  }, [input]);
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -459,12 +467,13 @@ export function Thread({ messages, isLoading, isStreaming, onSend }: ThreadProps
         <div className="max-w-[788px] mx-auto w-full pb-4 px-4">
         <div className="border-glow relative flex items-end backdrop-blur-xl bg-neutral-950/60 rounded-xl">
           <textarea
+            ref={textareaRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Ask about your memories..."
             autoFocus
-            className="flex-1 px-4 py-3 bg-transparent text-sm text-neutral-200 placeholder-neutral-500 focus:outline-none resize-none max-h-40"
+            className="flex-1 px-4 py-3 bg-transparent text-sm text-neutral-200 placeholder-neutral-500 focus:outline-none resize-none max-h-40 overflow-y-auto"
             rows={1}
           />
           <button
