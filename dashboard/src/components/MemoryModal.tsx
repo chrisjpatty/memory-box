@@ -50,13 +50,14 @@ export function MemoryModal() {
           <Drawer.Portal>
             <Drawer.Overlay className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm" />
             <Drawer.Content
-              className="fixed inset-x-0 bottom-0 z-50 h-screen overflow-y-auto outline-none"
+              className="fixed inset-x-0 bottom-0 z-50 h-screen overflow-hidden outline-none"
               style={{ background: 'transparent' }}
-              onClick={handleDismiss}
               aria-describedby={undefined}
             >
               <Drawer.Title className="sr-only">Memory detail</Drawer.Title>
 
+              {/* Inner scroll wrapper — clips Vaul's ::after pseudo-element */}
+              <div className="h-full overflow-y-auto" onClick={handleDismiss}>
               {/* Centering wrapper — centers short content, grows for tall */}
               <div className="flex min-h-full items-center justify-center pt-[10vh] pb-4 px-3 md:px-4">
                 {/* The visible card — natural height, no internal scroll */}
@@ -83,6 +84,7 @@ export function MemoryModal() {
                   {/* Content at natural height */}
                   <MemoryDetail memoryId={id} onClose={handleDismiss} cardData={location.state?.cardData} />
                 </div>
+              </div>
               </div>
             </Drawer.Content>
           </Drawer.Portal>

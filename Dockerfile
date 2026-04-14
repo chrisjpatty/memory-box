@@ -25,6 +25,9 @@ COPY --from=builder /app/tools ./tools
 COPY --from=builder /app/mcp ./mcp
 COPY --from=builder /app/dashboard/dist ./dashboard/dist
 COPY --from=builder /app/dashboard/src/components/MemoryCard ./dashboard/src/components/MemoryCard
+COPY --from=builder /app/dashboard/src/lib ./dashboard/src/lib
+COPY --from=builder /app/dashboard/node_modules ./dashboard/node_modules
+COPY --from=builder /app/dashboard/package.json ./dashboard/package.json
 COPY --from=builder /app/package.json ./
 
 # Use non-root user already present in oven/bun image (bun:1000)

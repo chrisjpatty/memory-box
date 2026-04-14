@@ -44,6 +44,7 @@ export function AppShell() {
   const linkRefs = useRef<(HTMLAnchorElement | null)[]>([]);
   const contentRef = useRef<HTMLDivElement>(null);
   const [navOffset, setNavOffset] = useState(0);
+  const hasAnimated = useRef(false);
 
   const activeIndex = getNavIndex(pathname);
 
@@ -72,6 +73,8 @@ export function AppShell() {
 
   useEffect(() => {
     computeOffset();
+    // Enable transitions after initial position is set
+    requestAnimationFrame(() => { hasAnimated.current = true; });
   }, [computeOffset]);
 
   useEffect(() => {
@@ -197,10 +200,10 @@ export function AppShell() {
         {/* Desktop nav */}
         <nav
           ref={navRef}
-          className="hidden md:flex absolute left-1/2 items-center gap-6"
+          className="hidden md:flex absolute left-1/2 items-center gap-10"
           style={{
             transform: `translateX(calc(-50% + ${navOffset}px))`,
-            transition: 'transform 330ms cubic-bezier(0.15, 0, 0.35, 1)',
+            transition: hasAnimated.current ? 'transform 330ms cubic-bezier(0.15, 0, 0.35, 1)' : 'none',
           }}
         >
           {modes.map((mode, i) => {
@@ -219,9 +222,9 @@ export function AppShell() {
                   }`
                 }
                 style={({ isActive }) => ({
-                  transform: isActive ? 'scale(1.25)' : 'scale(1) translateY(2px)',
-                  opacity: isActive ? 1 : 0.5,
-                  transition: 'transform 330ms ease-out, opacity 330ms ease-out',
+                  transform: isActive ? 'scale(1.5) translateY(3px)' : 'scale(0.95) translateY(2px)',
+                  opacity: isActive ? 1 : 0.4,
+                  transition: hasAnimated.current ? 'transform 330ms ease-out, opacity 330ms ease-out' : 'none',
                 })}
               >
                 <Icon size={14} weight="bold" />
@@ -235,16 +238,16 @@ export function AppShell() {
             to="/import"
             onClick={(e) => handleNavTransition(e, '/import', IMPORT_INDEX)}
             className={({ isActive }) =>
-              `flex items-center gap-1.5 text-sm font-semibold tracking-tight origin-center ${
+              `flex items-center gap-1.5 text-sm font-semibold tracking-tight origin-right ${
                 isActive
                   ? 'text-white'
                   : 'text-neutral-400 hover:opacity-75'
               }`
             }
             style={({ isActive }) => ({
-              transform: isActive ? 'scale(1.1)' : 'scale(1)',
+              transform: isActive ? 'scale(1.5) translateY(3px)' : 'scale(1.1)',
               opacity: isActive ? 1 : 0.5,
-              transition: 'transform 330ms ease-out, opacity 330ms ease-out',
+              transition: hasAnimated.current ? 'transform 330ms ease-out, opacity 330ms ease-out' : 'none',
             })}
           >
             <Plus size={14} weight="bold" />
