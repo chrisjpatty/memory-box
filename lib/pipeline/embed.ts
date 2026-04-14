@@ -15,8 +15,8 @@ class NomicProvider implements EmbeddingProvider {
   private baseUrl: string;
 
   constructor() {
-    const host = process.env.EMBEDDING_HOST || 'localhost';
-    const port = process.env.EMBEDDING_PORT || '8089';
+    const host = process.env.KNOWLEDGE_EMBEDDINGS_HOST || 'localhost';
+    const port = process.env.KNOWLEDGE_EMBEDDINGS_PORT || '8080';
     this.baseUrl = `http://${host}:${port}`;
   }
 
