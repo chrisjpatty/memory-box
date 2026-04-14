@@ -118,10 +118,10 @@ export function Memories() {
               <button
                 onClick={() => setFilterOpen((v) => !v)}
                 style={{ width: 'var(--bar-h)', height: 'var(--bar-h)' }}
-                className={`flex items-center justify-center shrink-0 rounded-lg text-sm border-[1.5px] backdrop-blur-xl bg-neutral-950/60 ${
+                className={`border-glow flex items-center justify-center shrink-0 rounded-lg text-sm backdrop-blur-xl bg-neutral-950/60 ${
                   activeTypes.length > 0
-                    ? 'text-white border-neutral-600'
-                    : 'text-neutral-400 border-neutral-600 hover:text-neutral-200'
+                    ? 'text-white'
+                    : 'text-neutral-400 hover:text-neutral-200'
                 }`}
               >
                 <FunnelSimple size={20} weight="bold" />
@@ -171,7 +171,7 @@ export function Memories() {
             {/* Search bar */}
             <form
               onSubmit={(e) => { e.preventDefault(); submitSearch(); }}
-              className="flex-1 min-w-0 flex items-center gap-0 relative backdrop-blur-xl bg-neutral-950/60 rounded-lg"
+              className="border-glow flex-1 min-w-0 flex items-center gap-0 relative backdrop-blur-xl bg-neutral-950/60 rounded-lg"
             >
               <input
                 type="text"
@@ -179,7 +179,7 @@ export function Memories() {
                 onChange={(e) => setInputValue(e.target.value)}
                 placeholder="Search memories..."
                 style={{ height: 'var(--bar-h)', fontSize: 'var(--bar-fs)' }}
-                className="flex-1 min-w-0 pl-4 pr-10 bg-transparent border-[1.5px] border-neutral-600 border-r-0 rounded-l-lg text-neutral-200 placeholder-neutral-500 focus:outline-none"
+                className="flex-1 min-w-0 pl-4 pr-10 bg-transparent rounded-l-lg text-neutral-200 placeholder-neutral-500 focus:outline-none"
               />
               {inputValue && (
                 <button
@@ -194,7 +194,7 @@ export function Memories() {
               <button
                 type="submit"
                 style={{ width: 'var(--bar-h)', height: 'var(--bar-h)' }}
-                className="flex items-center justify-center shrink-0 rounded-r-lg border-[1.5px] border-neutral-600 border-l-0 text-neutral-400 hover:text-neutral-200"
+                className="flex items-center justify-center shrink-0 rounded-r-lg text-neutral-400 hover:text-neutral-200"
               >
                 <MagnifyingGlass size={18} weight="bold" />
               </button>

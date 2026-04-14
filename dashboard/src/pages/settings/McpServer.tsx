@@ -207,7 +207,7 @@ export function McpServer() {
       {!status?.enabled ? (
         /* --- Disabled state --- */
         <section>
-          <div className="bg-neutral-950 border border-neutral-800 rounded-lg p-5 mb-4">
+          <div className="border-glow bg-neutral-950 rounded-lg p-5 mb-4">
             <p className="text-sm text-neutral-400 leading-relaxed mb-4">
               The MCP (Model Context Protocol) server lets AI clients like Claude Desktop, VS Code Copilot,
               and Postman connect directly to your Memory Box. They can search, store, and explore your
@@ -229,7 +229,7 @@ export function McpServer() {
         /* --- Enabled state --- */
         <div>
           {/* Status indicator */}
-          <section className="pb-6 mb-6 border-b border-neutral-800">
+          <section className="pb-6 mb-6 divider-glow">
             <div className="flex items-center gap-2 mb-3">
               <div className="w-2 h-2 rounded-full bg-green-500" />
               <span className="text-sm font-medium text-neutral-200">MCP Server is active</span>
@@ -254,23 +254,23 @@ export function McpServer() {
                 </p>
               </div>
             ) : status.tokenHint ? (
-              <div className="flex items-center gap-3 bg-neutral-950 border border-neutral-800 rounded-lg px-4 py-3 mb-3">
+              <div className="border-glow flex items-center gap-3 bg-neutral-950 rounded-lg px-4 py-3 mb-3">
                 <span className="font-mono text-sm text-neutral-400">{status.tokenHint}</span>
               </div>
             ) : null}
           </section>
 
           {/* Connection details */}
-          <section className="pb-6 mb-6 border-b border-neutral-800">
+          <section className="pb-6 mb-6 divider-glow">
             <h3 className="text-sm font-medium text-neutral-200 mb-1">Endpoint</h3>
             <p className="text-xs text-neutral-500 mb-3">MCP clients connect to this URL using Streamable HTTP transport.</p>
-            <code className="block bg-neutral-950 border border-neutral-800 rounded-lg px-4 py-2.5 text-sm text-neutral-300 font-mono">
+            <code className="border-glow block bg-neutral-950 rounded-lg px-4 py-2.5 text-sm text-neutral-300 font-mono">
               {mcpUrl}
             </code>
           </section>
 
           {/* Config snippets */}
-          <section className="pb-6 mb-6 border-b border-neutral-800">
+          <section className="pb-6 mb-6 divider-glow">
             <h3 className="text-sm font-medium text-neutral-200 mb-1">Client Configuration</h3>
             <p className="text-xs text-neutral-500 mb-3">
               {revealedToken
@@ -282,12 +282,12 @@ export function McpServer() {
           </section>
 
           {/* Available tools */}
-          <section className="pb-6 mb-6 border-b border-neutral-800">
+          <section className="pb-6 mb-6 divider-glow">
             <h3 className="text-sm font-medium text-neutral-200 mb-1">Available Tools</h3>
             <p className="text-xs text-neutral-500 mb-3">These tools are exposed to connected MCP clients.</p>
             <div className="grid gap-2">
               {mcpTools.map((tool) => (
-                <div key={tool.name} className="flex items-center gap-3 bg-neutral-950 border border-neutral-800 rounded-lg px-3 py-2">
+                <div key={tool.name} className="border-glow flex items-center gap-3 bg-neutral-950 rounded-lg px-3 py-2">
                   <Plugs size={14} weight="bold" className="text-neutral-600 shrink-0" />
                   <code className="text-xs text-neutral-300 font-mono">{tool.name}</code>
                   <span className="text-xs text-neutral-500">{tool.desc}</span>

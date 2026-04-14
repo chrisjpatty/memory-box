@@ -182,7 +182,7 @@ function ChangePassword() {
         )}
         <button
           onClick={() => { setSuccess(false); setOpen(true); }}
-          className="px-4 py-2 rounded-lg text-sm font-medium border-[1.5px] border-neutral-600 text-neutral-300 hover:text-white hover:border-neutral-500 transition-colors"
+          className="border-glow px-4 py-2 rounded-lg text-sm font-medium text-neutral-300 hover:text-white transition-colors"
         >
           Change password
         </button>
@@ -205,7 +205,7 @@ function ChangePassword() {
           placeholder="Current password"
           required
           autoFocus
-          className="w-full bg-neutral-950 border-[1.5px] border-neutral-600 rounded-lg px-4 py-2 text-sm text-neutral-200 placeholder-neutral-500 focus:outline-none focus:border-neutral-500"
+          className="border-glow w-full bg-neutral-950 rounded-lg px-4 py-2 text-sm text-neutral-200 placeholder-neutral-500 focus:outline-none"
         />
         <input
           type="password"
@@ -213,7 +213,7 @@ function ChangePassword() {
           onChange={(e) => setNewPassword(e.target.value)}
           placeholder="New password (min 8 characters)"
           required
-          className="w-full bg-neutral-950 border-[1.5px] border-neutral-600 rounded-lg px-4 py-2 text-sm text-neutral-200 placeholder-neutral-500 focus:outline-none focus:border-neutral-500"
+          className="border-glow w-full bg-neutral-950 rounded-lg px-4 py-2 text-sm text-neutral-200 placeholder-neutral-500 focus:outline-none"
         />
         <input
           type="password"
@@ -221,7 +221,7 @@ function ChangePassword() {
           onChange={(e) => setConfirmPassword(e.target.value)}
           placeholder="Confirm new password"
           required
-          className="w-full bg-neutral-950 border-[1.5px] border-neutral-600 rounded-lg px-4 py-2 text-sm text-neutral-200 placeholder-neutral-500 focus:outline-none focus:border-neutral-500"
+          className="border-glow w-full bg-neutral-950 rounded-lg px-4 py-2 text-sm text-neutral-200 placeholder-neutral-500 focus:outline-none"
         />
       </div>
       <div className="mt-3 flex gap-2">
@@ -269,17 +269,17 @@ export function General() {
         <p className="text-sm text-neutral-500">Account and instance settings</p>
       </div>
 
-      <section className="pb-6 mb-6 border-b border-neutral-800">
+      <section className="pb-6 mb-6 divider-glow">
         <h3 className="text-sm font-medium text-neutral-200 mb-1">Password</h3>
         <p className="text-xs text-neutral-500 mb-3">Change your admin password.</p>
         <ChangePassword />
       </section>
 
-      <section className="pb-6 mb-6 border-b border-neutral-800">
+      <section className="pb-6 mb-6 divider-glow">
         <h3 className="text-sm font-medium text-neutral-200 mb-1">API Endpoint</h3>
         <p className="text-xs text-neutral-500 mb-3">Send memories to this URL using a POST request with an <Link to="/settings/tokens" className="text-neutral-300 underline underline-offset-2 hover:text-white transition-colors">API token</Link>.</p>
         <div className="flex items-center gap-3">
-          <code className="flex-1 bg-neutral-950 border border-neutral-800 rounded-lg px-4 py-2.5 text-sm text-neutral-300 font-mono">
+          <code className="border-glow flex-1 bg-neutral-950 rounded-lg px-4 py-2.5 text-sm text-neutral-300 font-mono">
             {endpoint}
           </code>
           <button
@@ -293,7 +293,7 @@ export function General() {
         </div>
       </section>
 
-      <section className="pb-6 mb-6 border-b border-neutral-800">
+      <section className="pb-6 mb-6 divider-glow">
         <h3 className="text-sm font-medium text-neutral-200 mb-1">API Reference</h3>
         <p className="text-xs text-neutral-500 mb-3">Example code for ingesting memories. Replace <code className="text-neutral-400">&lt;your-token&gt;</code> with an API token.</p>
         <ApiReference />
@@ -304,7 +304,7 @@ export function General() {
         <p className="text-xs text-neutral-500 mb-3">Sign out of your account.</p>
         <button
           onClick={handleLogout}
-          className="px-4 py-2 rounded-lg text-sm font-medium border-[1.5px] border-neutral-600 text-neutral-300 hover:text-white hover:border-neutral-500 transition-colors"
+          className="border-glow px-4 py-2 rounded-lg text-sm font-medium text-neutral-300 hover:text-white transition-colors"
         >
           Logout
         </button>

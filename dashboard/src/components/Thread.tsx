@@ -335,7 +335,7 @@ export function Thread({ messages, isLoading, isStreaming, onSend }: ThreadProps
                 <button
                   key={s}
                   onClick={() => onSend(s)}
-                  className="px-3 py-1.5 rounded-full text-xs font-medium border border-neutral-800 text-neutral-500 hover:text-neutral-300 hover:border-neutral-600 transition-colors"
+                  className="border-glow px-3 py-1.5 rounded-full text-xs font-medium text-neutral-500 hover:text-neutral-300 transition-colors"
                 >
                   {s}
                 </button>
@@ -457,7 +457,7 @@ export function Thread({ messages, isLoading, isStreaming, onSend }: ThreadProps
       )}
       <div className="fixed bottom-0 left-0 md:left-56 right-0 px-4 md:px-8 z-10 bg-neutral-950 before:content-[''] before:absolute before:inset-x-0 before:bottom-[calc(100%-0.75rem)] before:h-10 before:bg-gradient-to-t before:from-neutral-950/80 before:to-transparent before:pointer-events-none">
         <div className="max-w-[788px] mx-auto w-full pb-4 px-4">
-        <div className="relative flex items-end backdrop-blur-xl bg-neutral-950/60 border-[1.5px] border-neutral-600 rounded-xl focus-within:border-neutral-500 transition-colors">
+        <div className="border-glow relative flex items-end backdrop-blur-xl bg-neutral-950/60 rounded-xl">
           <textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
