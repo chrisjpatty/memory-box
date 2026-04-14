@@ -31,18 +31,9 @@ export function MemoryModal() {
 
   if (!id) return null;
 
-  return (
-    <>
-      {/* Backdrop while loading (before drawer mounts) */}
-      {isLoading && (
-        <div
-          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm animate-[modal-backdrop-in_200ms_ease-out]"
-          onClick={handleClose}
-        />
-      )}
+  if (isLoading) return null;
 
-      {/* Vaul drawer — scrollable container, whole card scrolls */}
-      {!isLoading && (
+  return (
         <Drawer.Root
           open={drawerOpen}
           onOpenChange={(open) => { if (!open) handleDismiss(); }}
@@ -89,7 +80,5 @@ export function MemoryModal() {
             </Drawer.Content>
           </Drawer.Portal>
         </Drawer.Root>
-      )}
-    </>
   );
 }
