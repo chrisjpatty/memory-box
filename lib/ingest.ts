@@ -219,6 +219,7 @@ async function ingestContent(args: IngestContentArgs): Promise<IngestResult> {
   let markdown: string | undefined;
   let html: string | undefined;
   let files: { buffer: Buffer; filename: string; contentType: string }[] | undefined;
+  let localizedImages: { id: string; buffer: Buffer; contentType: string }[] | undefined;
   let extractedSourceUrl = sourceUrl;
   let classification = initialClassification;
 
@@ -228,6 +229,7 @@ async function ingestContent(args: IngestContentArgs): Promise<IngestResult> {
     markdown = text;
     html = extracted.html;
     files = extracted.files;
+    localizedImages = extracted.localizedImages;
     extractedSourceUrl = extracted.sourceUrl || extractedSourceUrl;
 
     // Merge extraction metadata into classification
@@ -264,8 +266,20 @@ async function ingestContent(args: IngestContentArgs): Promise<IngestResult> {
   // Step 2: Chunk
   const chunks = await chunkText(text, classification.contentType);
 
-  // Step 3: Embed
-  const embeddings = await getEmbeddingProvider().embed(chunks);
+  // Step 3: Embed text
+  const embedder = getEmbeddingProvider();
+  const embeddings = await embedder.embed(chunks);
+
+  // Step 3b: Embed images
+  const imageEmbeddings: { mediaId: string; embedding: number[] }[] = [];
+  if (localizedImages?.length) {
+    for (const img of localizedImages) {
+      try {
+        const embedding = await embedder.embedImage(img.buffer.toString('base64'));
+        imageEmbeddings.push({ mediaId: img.id, embedding });
+      } catch { /* skip failed image embeddings */ }
+    }
+  }
 
   // Step 4: Store (single transaction)
   const result = await store({
@@ -279,6 +293,7 @@ async function ingestContent(args: IngestContentArgs): Promise<IngestResult> {
     markdown,
     html,
     files,
+    imageEmbeddings: imageEmbeddings.length > 0 ? imageEmbeddings : undefined,
     contentHash: hash,
   });
 

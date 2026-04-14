@@ -66,6 +66,14 @@ CREATE TABLE IF NOT EXISTS memory_chunks (
 
 CREATE INDEX IF NOT EXISTS idx_chunks_embedding ON memory_chunks USING hnsw (embedding vector_cosine_ops);
 
+-- Stored media files (images downloaded during ingestion)
+CREATE TABLE IF NOT EXISTS media (
+  id            TEXT PRIMARY KEY,
+  key           TEXT NOT NULL,
+  content_type  TEXT NOT NULL,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 -- Auth tokens (bearer tokens for API ingestion)
 CREATE TABLE IF NOT EXISTS auth_tokens (
   id          SERIAL PRIMARY KEY,

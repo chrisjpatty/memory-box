@@ -1,95 +1,59 @@
 /**
- * Pluggable embedding provider interface.
- * Default implementation: Ollama with nomic-embed-text.
+ * Embedding provider: nomic-embed-v1.5 via mindthemath/nomic-embed-v1.5 container.
+ * Supports both text and image embeddings in the same 768-dim vector space.
  */
 
 export interface EmbeddingProvider {
   embed(texts: string[]): Promise<number[][]>;
   embedOne(text: string): Promise<number[]>;
+  embedImage(base64: string): Promise<number[]>;
   readonly dimension: number;
 }
 
-// --- Ollama Provider ---
-
-const BATCH_SIZE = 32;
-
-class OllamaProvider implements EmbeddingProvider {
-  readonly dimension: number;
-  private model: string;
+class NomicProvider implements EmbeddingProvider {
+  readonly dimension = 768;
   private baseUrl: string;
 
   constructor() {
-    this.model = process.env.EMBEDDING_MODEL || 'nomic-embed-text';
-    this.dimension = parseInt(process.env.EMBEDDING_DIMENSION || '768');
-    this.baseUrl = process.env.OLLAMA_BASE_URL
-      || (process.env.OLLAMA_URL ? `${process.env.OLLAMA_URL}/api` : null)
-      || 'http://localhost:11434/api';
+    const host = process.env.EMBEDDING_HOST || 'localhost';
+    const port = process.env.EMBEDDING_PORT || '8089';
+    this.baseUrl = `http://${host}:${port}`;
   }
 
   async embedOne(text: string): Promise<number[]> {
-    const [embedding] = await this.embedBatch([text]);
-    return embedding;
+    const res = await fetch(`${this.baseUrl}/embed`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ input: text }),
+    });
+    if (!res.ok) {
+      throw new Error(`Embedding failed: ${res.status} ${await res.text()}`);
+    }
+    const data = await res.json() as { embedding: number[] };
+    return data.embedding;
   }
 
   async embed(texts: string[]): Promise<number[][]> {
-    const results: number[][] = [];
-    for (let i = 0; i < texts.length; i += BATCH_SIZE) {
-      const batch = texts.slice(i, i + BATCH_SIZE);
-      const embeddings = await this.embedBatch(batch);
-      results.push(...embeddings);
-    }
-    return results;
-  }
-
-  private async embedBatch(texts: string[]): Promise<number[][]> {
-    const response = await fetch(`${this.baseUrl}/embed`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: this.model, input: texts, truncate: true }),
-    });
-    if (!response.ok) {
-      const body = await response.text();
-      if (response.status === 400 && body.includes('context length')) {
-        // Batch failed due to a too-long input — fall back to one-at-a-time
-        // with truncation so one oversized chunk doesn't sink the whole import.
-        return this.embedWithTruncation(texts);
-      }
-      throw new Error(`Ollama embed failed: ${response.status} ${body}`);
-    }
-    const data = await response.json() as { embeddings: number[][] };
-    return data.embeddings;
-  }
-
-  /**
-   * Embed texts one-at-a-time, progressively truncating any that exceed the
-   * model's context window. Preserves as much content as possible by halving
-   * only the texts that actually fail.
-   */
-  private async embedWithTruncation(texts: string[]): Promise<number[][]> {
+    // Process sequentially — the slim/quantized model doesn't support batching
     const results: number[][] = [];
     for (const text of texts) {
-      let current = text;
-      while (true) {
-        const res = await fetch(`${this.baseUrl}/embed`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ model: this.model, input: [current], truncate: true }),
-        });
-        if (res.ok) {
-          const data = await res.json() as { embeddings: number[][] };
-          results.push(data.embeddings[0]);
-          break;
-        }
-        const body = await res.text();
-        if (res.status === 400 && body.includes('context length') && current.length > 100) {
-          // Halve the text and retry
-          current = current.slice(0, Math.floor(current.length / 2));
-          continue;
-        }
-        throw new Error(`Ollama embed failed: ${res.status} ${body}`);
-      }
+      results.push(await this.embedOne(text));
     }
     return results;
+  }
+
+  async embedImage(base64: string): Promise<number[]> {
+    const dataUri = base64.startsWith('data:') ? base64 : `data:image/jpeg;base64,${base64}`;
+    const res = await fetch(`${this.baseUrl}/img/embed`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content: dataUri }),
+    });
+    if (!res.ok) {
+      throw new Error(`Image embedding failed: ${res.status} ${await res.text()}`);
+    }
+    const data = await res.json() as { embedding: number[] };
+    return data.embedding;
   }
 }
 
@@ -99,7 +63,7 @@ let provider: EmbeddingProvider | null = null;
 
 export function getEmbeddingProvider(): EmbeddingProvider {
   if (!provider) {
-    provider = new OllamaProvider();
+    provider = new NomicProvider();
   }
   return provider;
 }

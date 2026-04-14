@@ -11,9 +11,6 @@ agent:
     frontend: true
     messaging: false
 models:
-  ollama:
-    provider: ollama
-    models: [nomic-embed-text]
   anthropic:
     provider: anthropic
 
@@ -33,6 +30,10 @@ knowledge:
       port: 9000
       volume: /data
     persistent: true
+  embeddings:
+    container:
+      image: mindthemath/nomic-embed-v1.5:slim
+      port: 8080
 
 dev:
   interfaces:

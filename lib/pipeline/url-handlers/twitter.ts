@@ -1,4 +1,5 @@
 import type { UrlHandler, UrlHandlerResult } from './index';
+import { storeMedia } from '../media';
 
 const API_BASE = 'https://api.twitter.com';
 
@@ -89,6 +90,7 @@ interface TweetData {
     like_count: number;
     quote_count: number;
     bookmark_count?: number;
+    impression_count?: number;
   };
   entities?: {
     urls?: { url: string; expanded_url: string; display_url: string }[];
@@ -234,6 +236,40 @@ async function handleTweet(tweetId: string, url: URL): Promise<UrlHandlerResult>
 
   const tweetText = tweet.note_tweet?.text || tweet.text;
 
+  // Download and store media images locally
+  const localMediaUrls: string[] = [];
+  for (const mediaUrl of mediaUrls) {
+    try {
+      const res = await fetch(mediaUrl, { signal: AbortSignal.timeout(15_000) });
+      if (res.ok) {
+        const buf = Buffer.from(await res.arrayBuffer());
+        const ct = res.headers.get('content-type') || 'image/jpeg';
+        const img = await storeMedia(buf, ct);
+        localMediaUrls.push(`/api/media/${img.id}`);
+      } else {
+        localMediaUrls.push(mediaUrl); // fallback to external
+      }
+    } catch {
+      localMediaUrls.push(mediaUrl);
+    }
+  }
+
+  // Download and store avatar
+  let avatarUrl = '';
+  const profileImageUrl = author ? includes.users?.find(u => u.id === tweet.author_id)?.profile_image_url : undefined;
+  if (profileImageUrl) {
+    try {
+      const bigUrl = profileImageUrl.replace('_normal.', '_bigger.');
+      const res = await fetch(bigUrl, { signal: AbortSignal.timeout(10_000) });
+      if (res.ok) {
+        const buf = Buffer.from(await res.arrayBuffer());
+        const ct = res.headers.get('content-type') || 'image/jpeg';
+        const img = await storeMedia(buf, ct);
+        avatarUrl = `/api/media/${img.id}`;
+      }
+    } catch { /* skip */ }
+  }
+
   // Build tags
   const tags: string[] = ['twitter', 'tweet'];
   if (author) tags.push(author.username.toLowerCase());
@@ -268,11 +304,13 @@ async function handleTweet(tweetId: string, url: URL): Promise<UrlHandlerResult>
     description: tweetText.slice(0, 300),
     tags: [...new Set(tags)],
     category,
+    contentType: 'tweet',
     metadata: {
       tweetId: tweet.id,
       authorName: author?.name || '',
-      authorUsername: author?.username || '',
-      authorVerified: author?.verified ? 'true' : 'false',
+      handle: author?.username || '',
+      avatarUrl,
+      verified: author?.verified ? 'true' : 'false',
       conversationId: tweet.conversation_id || '',
       likes: String(metrics?.like_count || 0),
       retweets: String(metrics?.retweet_count || 0),
@@ -280,10 +318,9 @@ async function handleTweet(tweetId: string, url: URL): Promise<UrlHandlerResult>
       quotes: String(metrics?.quote_count || 0),
       bookmarks: String(metrics?.bookmark_count || 0),
       createdAt: tweet.created_at || '',
-      hasMedia: String(mediaUrls.length > 0),
-      mediaCount: String(mediaUrls.length),
+      views: String(metrics?.impression_count || 0),
       url: url.href,
-      ...(mediaUrls.length > 0 ? { mediaUrls: mediaUrls.join(', ') } : {}),
+      ...(localMediaUrls.length > 0 ? { mediaUrls: localMediaUrls.join(', ') } : {}),
     },
   };
 }

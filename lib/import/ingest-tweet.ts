@@ -2,7 +2,7 @@
  * Direct tweet ingestion — bypasses the URL/classification pipeline entirely.
  *
  * Fetches tweet data via the Twitter API, builds structured metadata,
- * chunks, embeds, and stores as content_type: 'tweet'.
+ * downloads media, chunks, embeds (text + images), and stores as content_type: 'tweet'.
  */
 import {
   twitterFetch,
@@ -15,7 +15,9 @@ import { chunkText } from '../pipeline/chunk';
 import { getEmbeddingProvider } from '../pipeline/embed';
 import { checkDuplicate, store } from '../pipeline/store';
 import { contentHash } from '../pipeline/detect';
+import { storeMedia } from '../pipeline/media';
 import { getTwitterToken } from './twitter-token-store';
+import { query } from '../db';
 import type { IngestResult, ClassificationResult } from '../types';
 
 export { TwitterRateLimitError };
@@ -23,8 +25,6 @@ export { TwitterRateLimitError };
 /**
  * Ingest a tweet by ID or URL. Fetches full data from the API,
  * stores as a first-class 'tweet' content type with structured metadata.
- *
- * Returns IngestResult matching the same interface as ingest().
  */
 export async function ingestTweet(
   tweetIdOrUrl: string,
@@ -78,7 +78,7 @@ export async function ingestTweet(
     ? `https://x.com/${author.username}/status/${tweetId}`
     : canonicalUrl;
 
-  // Check for exact source URL dedup (in case the pattern check missed it)
+  // Check for exact source URL dedup
   const dupId = await checkDuplicate(undefined, sourceUrl);
   if (dupId) {
     return {
@@ -89,6 +89,42 @@ export async function ingestTweet(
       deduplicated: true,
       existingMemoryId: dupId,
     };
+  }
+
+  // Download and store media images locally
+  const localMediaUrls: string[] = [];
+  const imageBuffers: { mediaId: string; buffer: Buffer }[] = [];
+  for (const mediaUrl of mediaUrls) {
+    try {
+      const res = await fetch(mediaUrl, { signal: AbortSignal.timeout(15_000) });
+      if (res.ok) {
+        const buf = Buffer.from(await res.arrayBuffer());
+        const ct = res.headers.get('content-type') || 'image/jpeg';
+        const img = await storeMedia(buf, ct);
+        localMediaUrls.push(`/api/media/${img.id}`);
+        imageBuffers.push({ mediaId: img.id, buffer: img.buffer });
+      } else {
+        localMediaUrls.push(mediaUrl);
+      }
+    } catch {
+      localMediaUrls.push(mediaUrl);
+    }
+  }
+
+  // Download and store avatar
+  let avatarUrl = '';
+  const profileImageUrl = includes.users?.find((u: any) => u.id === tweet.author_id)?.profile_image_url;
+  if (profileImageUrl) {
+    try {
+      const bigUrl = profileImageUrl.replace('_normal.', '_bigger.');
+      const res = await fetch(bigUrl, { signal: AbortSignal.timeout(10_000) });
+      if (res.ok) {
+        const buf = Buffer.from(await res.arrayBuffer());
+        const ct = res.headers.get('content-type') || 'image/jpeg';
+        const img = await storeMedia(buf, ct);
+        avatarUrl = `/api/media/${img.id}`;
+      }
+    } catch { /* skip */ }
   }
 
   // Build tags
@@ -117,7 +153,6 @@ export async function ingestTweet(
 
   const metrics = tweet.public_metrics || {};
 
-  // Build classification directly — no LLM needed
   const classification: ClassificationResult = {
     contentType: 'tweet',
     title: author
@@ -129,25 +164,35 @@ export async function ingestTweet(
     metadata: {
       tweetId: tweet.id,
       authorName: author?.name || '',
-      authorUsername: author?.username || '',
-      authorVerified: author?.verified ? 'true' : 'false',
+      handle: author?.username || '',
+      avatarUrl,
+      verified: author?.verified ? 'true' : 'false',
       conversationId: tweet.conversation_id || '',
       likes: String(metrics.like_count || 0),
       retweets: String(metrics.retweet_count || 0),
       replies: String(metrics.reply_count || 0),
       quotes: String(metrics.quote_count || 0),
       bookmarks: String(metrics.bookmark_count || 0),
+      views: String(metrics.impression_count || 0),
       createdAt: tweet.created_at || '',
-      hasMedia: String(mediaUrls.length > 0),
-      mediaCount: String(mediaUrls.length),
       url: sourceUrl,
-      ...(mediaUrls.length > 0 ? { mediaUrls: mediaUrls.join(', ') } : {}),
+      ...(localMediaUrls.length > 0 ? { mediaUrls: localMediaUrls.join(', ') } : {}),
     },
   };
 
-  // Chunk and embed
+  // Chunk and embed text
+  const embedder = getEmbeddingProvider();
   const chunks = await chunkText(markdown, 'tweet');
-  const embeddings = await getEmbeddingProvider().embed(chunks);
+  const embeddings = await embedder.embed(chunks);
+
+  // Embed images
+  const imageEmbeddings: { mediaId: string; embedding: number[] }[] = [];
+  for (const { mediaId, buffer } of imageBuffers) {
+    try {
+      const embedding = await embedder.embedImage(buffer.toString('base64'));
+      imageEmbeddings.push({ mediaId, embedding });
+    } catch { /* skip */ }
+  }
 
   // Store
   const hash = contentHash(markdown);
@@ -158,6 +203,7 @@ export async function ingestTweet(
     embeddings,
     sourceUrl,
     markdown,
+    imageEmbeddings: imageEmbeddings.length > 0 ? imageEmbeddings : undefined,
     contentHash: hash,
   });
 
@@ -168,11 +214,6 @@ export async function ingestTweet(
     chunks: result.chunks,
   };
 }
-
-/**
- * Check for duplicate by source_url LIKE pattern (matches any username variant).
- */
-import { query } from '../db';
 
 async function checkDuplicateByPattern(pattern: string): Promise<string | null> {
   const result = await query(

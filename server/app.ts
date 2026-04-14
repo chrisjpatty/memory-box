@@ -17,6 +17,7 @@ import { createMcpHandler } from '../mcp/server';
 import { mcpSettings } from './api/mcp-settings';
 import { oauthWellKnown, oauthRoutes } from './api/oauth';
 import { oauthConsentApi } from './api/oauth-consent';
+import { mediaApi } from './api/media';
 import { serveStatic } from 'hono/bun';
 import type { IngestRequest } from '../lib/types';
 
@@ -46,9 +47,10 @@ export function createApp(options?: AppOptions) {
   // Auth routes (no session required)
   app.route('/api/auth', auth);
 
-  // Session-protected API routes (skip Twitter OAuth callback — it's validated by PKCE state)
+  // Session-protected API routes (skip Twitter OAuth callback and media serving)
   app.use('/api/*', async (c, next) => {
     if (c.req.path === '/api/import/twitter/callback') return next();
+    if (c.req.path.startsWith('/api/media/')) return next();
     const authenticated = await validateSession(c);
     if (!authenticated) {
       return c.json({ error: 'Unauthorized' }, 401);
@@ -67,6 +69,7 @@ export function createApp(options?: AppOptions) {
   app.route('/api/chat', chat);
   app.route('/api/mcp', mcpSettings);
   app.route('/api/oauth', oauthConsentApi);
+  app.route('/api/media', mediaApi);
 
   // --- Ingestion routes (bearer token auth) ---
 

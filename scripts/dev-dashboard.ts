@@ -40,9 +40,11 @@ try {
 // Host defaults — assumes ast dev is running and exposing services on localhost.
 process.env.POSTGRES_HOST ??= 'localhost';
 process.env.MINIO_HOST ??= 'localhost';
+process.env.EMBEDDING_HOST ??= 'localhost';
+process.env.EMBEDDING_PORT ??= '8089';
 
 const app = createApp({
-  corsOrigins: ['http://localhost:5173', 'http://localhost:5174'],
+  corsOrigins: ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175'],
   skipStatic: true,
 });
 

@@ -23,6 +23,8 @@ export interface StoreInput {
   html?: string;
   /** Files to store in MinIO (images, media, etc.) */
   files?: { buffer: Buffer; filename: string; contentType: string }[];
+  /** Image embeddings to store as additional vector chunks */
+  imageEmbeddings?: { mediaId: string; embedding: number[] }[];
   /** Content hash for dedup */
   contentHash?: string;
 }
@@ -59,7 +61,7 @@ export async function store(input: StoreInput): Promise<StoreResult> {
   const now = new Date().toISOString();
   const {
     content, classification, chunks, embeddings,
-    userTitle, userTags, sourceUrl, markdown, html, files, contentHash,
+    userTitle, userTags, sourceUrl, markdown, html, files, imageEmbeddings, contentHash,
   } = input;
 
   const title = userTitle || classification.title;
@@ -125,13 +127,25 @@ export async function store(input: StoreInput): Promise<StoreResult> {
       ],
     );
 
-    // Insert chunks with embeddings
+    // Insert text chunks with embeddings
     for (let i = 0; i < chunks.length; i++) {
       await client.query(
         `INSERT INTO memory_chunks (memory_id, chunk_index, text, embedding)
          VALUES ($1, $2, $3, $4)`,
         [id, i, chunks[i], pgvector.toSql(embeddings[i])],
       );
+    }
+
+    // Insert image embedding chunks
+    if (imageEmbeddings?.length) {
+      for (let i = 0; i < imageEmbeddings.length; i++) {
+        const ie = imageEmbeddings[i];
+        await client.query(
+          `INSERT INTO memory_chunks (memory_id, chunk_index, text, embedding)
+           VALUES ($1, $2, $3, $4)`,
+          [id, chunks.length + i, `[image:${ie.mediaId}]`, pgvector.toSql(ie.embedding)],
+        );
+      }
     }
 
     await client.query('COMMIT');

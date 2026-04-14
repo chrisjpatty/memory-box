@@ -93,11 +93,11 @@ export function TweetCard({ memory, onDelete, variant }: MemoryCardProps) {
   const authorName = extra.authorName || extra.author || 'Unknown';
   const handle = extra.handle || extra.author || 'user';
   const rawAvatar = extra.avatarUrl || '';
-  const avatarUrl = rawAvatar.startsWith('http') ? rawAvatar : rawAvatar ? `/api/memories/${memory.id}/media/${rawAvatar}` : '';
+  const avatarUrl = rawAvatar.startsWith('/api/') || rawAvatar.startsWith('http') ? rawAvatar : rawAvatar ? `/api/memories/${memory.id}/media/${rawAvatar}` : '';
   const verified = extra.verified === 'true';
   const tweetText = memory.summary || memory.title;
   const mediaUrls = (extra.mediaUrls || extra.mediaUrl || '').split(',').map((u) => u.trim()).filter(Boolean)
-    .map((u) => u.startsWith('http') ? u : `/api/memories/${memory.id}/media/${u}`);
+    .map((u) => u.startsWith('/api/') || u.startsWith('http') ? u : `/api/memories/${memory.id}/media/${u}`);
 
   const replies = formatStat(extra.replies);
   const retweets = formatStat(extra.retweets);

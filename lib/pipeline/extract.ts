@@ -1,16 +1,16 @@
 /**
  * Content extraction: fetches/processes raw content into text for indexing.
- * Side effects: HTTP fetches, Claude Vision API calls. No database access.
+ * Side effects: HTTP fetches. No database access (except media storage).
  */
 import * as cheerio from 'cheerio';
 import TurndownService from 'turndown';
-import sharp from 'sharp';
 import { PDFParse } from 'pdf-parse';
-import { Agent } from '@mastra/core/agent';
 import { tryUrlHandler } from './url-handlers';
 import { isTweetUrl } from './url-handlers/twitter';
 import { resolveRelativeUrls } from './url-utils';
+import { downloadAndLocalizeImages, storeMedia } from './media';
 import type { ClassificationResult } from '../types';
+import type { LocalizedImage } from './media';
 
 // Re-export for consumers that import from extract
 export { resolveRelativeUrls } from './url-utils';
@@ -35,6 +35,8 @@ export interface ExtractionResult {
   html?: string;
   /** Files to store in MinIO (images, media, etc.) */
   files?: { buffer: Buffer; filename: string; contentType: string }[];
+  /** Images that were downloaded and stored via the media table (for embedding) */
+  localizedImages?: LocalizedImage[];
   /** Extra metadata from extraction */
   metadata?: Record<string, string>;
   /** Extra tags from extraction */
@@ -263,17 +265,29 @@ export async function extractUrl(url: string): Promise<ExtractionResult> {
   // Try site-specific handlers first (GitHub, etc.)
   const handlerResult = await tryUrlHandler(trimmedUrl);
   if (handlerResult) {
-    const markdown = resolveRelativeUrls(handlerResult.markdown, trimmedUrl);
+    let markdown = resolveRelativeUrls(handlerResult.markdown, trimmedUrl);
+    const { markdown: localizedMd, images, replacements } = await downloadAndLocalizeImages(markdown);
+    markdown = localizedMd;
+
+    // Update metadata image URLs that were localized
+    const metadata: Record<string, string> = { ...handlerResult.metadata, url: trimmedUrl };
+    for (const [key, value] of Object.entries(metadata)) {
+      if (typeof value === 'string' && replacements.has(value)) {
+        metadata[key] = replacements.get(value)!;
+      }
+    }
+
     return {
       text: markdown,
       title: handlerResult.title,
       description: handlerResult.description,
       sourceUrl: trimmedUrl,
       html: handlerResult.cleanHtml,
-      metadata: { ...handlerResult.metadata, url: trimmedUrl },
+      metadata,
       tags: handlerResult.tags,
       category: handlerResult.category,
       contentType: handlerResult.contentType,
+      localizedImages: images,
     };
   }
 
@@ -296,32 +310,29 @@ export async function extractUrl(url: string): Promise<ExtractionResult> {
     if (tweet.authorName) searchParts.push(tweet.authorName);
     if (tweet.handle) searchParts.push(`@${tweet.handle}`);
     if (cleanText) searchParts.push(cleanText);
-    const searchText = searchParts.join('\n');
 
-    // Download tweet media and avatar, run media through vision pipeline
-    const files: { buffer: Buffer; filename: string; contentType: string }[] = [];
+    // Download tweet media and avatar, store via media table
+    const localizedImages: LocalizedImage[] = [];
     const localMediaUrls: string[] = [];
-    const mediaBuffers: Buffer[] = [];
+    let avatarMediaId = '';
 
     // Download media images in parallel
-    const mediaDownloads = tweet.mediaUrls.map(async (url, i) => {
-      try {
-        const res = await fetch(url, { signal: AbortSignal.timeout(15_000) });
-        if (res.ok) {
+    const mediaResults = await Promise.all(
+      tweet.mediaUrls.map(async (url) => {
+        try {
+          const res = await fetch(url, { signal: AbortSignal.timeout(15_000) });
+          if (!res.ok) return null;
           const buf = Buffer.from(await res.arrayBuffer());
           const ct = res.headers.get('content-type') || 'image/jpeg';
-          const ext = ct.includes('png') ? 'png' : 'jpg';
-          return { buf, ct, ext, i };
-        }
-      } catch { /* skip */ }
-      return null;
-    });
+          return await storeMedia(buf, ct);
+        } catch { return null; }
+      }),
+    );
 
-    for (const result of await Promise.all(mediaDownloads)) {
-      if (result) {
-        files.push({ buffer: result.buf, filename: `media-${result.i}.${result.ext}`, contentType: result.ct });
-        localMediaUrls.push(`media-${result.i}.${result.ext}`);
-        mediaBuffers.push(result.buf);
+    for (const img of mediaResults) {
+      if (img) {
+        localizedImages.push(img);
+        localMediaUrls.push(`/api/media/${img.id}`);
       }
     }
 
@@ -332,34 +343,10 @@ export async function extractUrl(url: string): Promise<ExtractionResult> {
         if (res.ok) {
           const buf = Buffer.from(await res.arrayBuffer());
           const ct = res.headers.get('content-type') || 'image/jpeg';
-          files.push({ buffer: buf, filename: 'avatar.jpg', contentType: ct });
+          const avatar = await storeMedia(buf, ct);
+          avatarMediaId = `/api/media/${avatar.id}`;
         }
       } catch { /* skip */ }
-    }
-
-    // Run media images through vision pipeline in parallel for descriptions
-    if (mediaBuffers.length > 0) {
-      const visionResults = await Promise.all(
-        mediaBuffers.map(async (buf) => {
-          try {
-            const vision = await prepareForVision(buf);
-            const response = await getVisionAgent().generate([{
-              role: 'user',
-              content: [
-                { type: 'text', text: 'Describe this image in detail for a personal memory database:' },
-                { type: 'image', image: vision.base64, mimeType: vision.mimeType },
-              ],
-            }]);
-            return response.text || '';
-          } catch {
-            return '';
-          }
-        }),
-      );
-      const descriptions = visionResults.filter(Boolean);
-      if (descriptions.length > 0) {
-        searchParts.push('Images:', ...descriptions);
-      }
     }
 
     return {
@@ -370,13 +357,13 @@ export async function extractUrl(url: string): Promise<ExtractionResult> {
       contentType: 'tweet',
       category: 'tweet',
       tags: ['twitter', 'tweet', ...(tweet.handle ? [tweet.handle.toLowerCase()] : [])],
-      files: files.length > 0 ? files : undefined,
+      localizedImages,
       metadata: {
         url: trimmedUrl,
         tweetId: tweetIdMatch?.[1] || '',
         authorName: tweet.authorName,
         handle: tweet.handle,
-        avatarUrl: tweet.avatarUrl ? 'avatar.jpg' : '',
+        avatarUrl: avatarMediaId,
         verified: 'false',
         likes: tweet.likes,
         retweets: tweet.retweets,
@@ -388,14 +375,17 @@ export async function extractUrl(url: string): Promise<ExtractionResult> {
     };
   }
 
+  // Download and localize all images in the markdown
+  const { markdown: localizedMd, images } = await downloadAndLocalizeImages(markdown);
+
   // Fetch HTML snapshot for iframe rendering (in parallel if Jina was used)
   const htmlSnapshot = 'cleanHtml' in rawFetched
     ? (rawFetched as any).cleanHtml
     : await fetchHtmlSnapshot(trimmedUrl);
 
-  // Find a representative image: prefer OG image, fall back to first markdown image
+  // Find a representative image from the localized markdown
   const ogImage = 'ogImage' in rawFetched ? (rawFetched as any).ogImage : '';
-  const imageUrl = ogImage || firstMarkdownImage(markdown) || '';
+  const imageUrl = ogImage || firstMarkdownImage(localizedMd) || '';
 
   // Add domain as a tag
   const tags: string[] = [];
@@ -404,11 +394,12 @@ export async function extractUrl(url: string): Promise<ExtractionResult> {
   } catch { /* ignore */ }
 
   return {
-    text: markdown,
+    text: localizedMd,
     title: rawFetched.title,
     description: rawFetched.description,
     sourceUrl: trimmedUrl,
     html: htmlSnapshot || undefined,
+    localizedImages: images,
     metadata: {
       url: trimmedUrl,
       pageTitle: rawFetched.title,
@@ -420,47 +411,6 @@ export async function extractUrl(url: string): Promise<ExtractionResult> {
 }
 
 // --- Image Extraction ---
-
-const VISION_MAX_DIMENSION = 1024;
-
-let visionAgent: Agent | null = null;
-
-function getVisionAgent(): Agent {
-  if (!visionAgent) {
-    visionAgent = new Agent({
-      id: 'image-describer',
-      name: 'Image Describer',
-      instructions: `You are an image description specialist. Given an image, provide a detailed text description that captures:
-1. The main subject and composition
-2. Important details, text, or objects visible
-3. Colors, mood, and style
-4. Any text or numbers visible in the image
-5. Context clues about what this image represents
-
-Be thorough but concise. Your description will be used to make this image searchable in a personal memory database, so include details that someone might search for later.`,
-      model: 'anthropic/claude-sonnet-4-5',
-    });
-  }
-  return visionAgent;
-}
-
-async function prepareForVision(originalBuffer: Buffer): Promise<{ base64: string; mimeType: string }> {
-  const image = sharp(originalBuffer);
-  const metadata = await image.metadata();
-  const width = metadata.width || 0;
-  const height = metadata.height || 0;
-
-  let pipeline = image;
-  if (width > VISION_MAX_DIMENSION || height > VISION_MAX_DIMENSION) {
-    pipeline = pipeline.resize(VISION_MAX_DIMENSION, VISION_MAX_DIMENSION, {
-      fit: 'inside',
-      withoutEnlargement: true,
-    });
-  }
-
-  const resized = await pipeline.jpeg({ quality: 85 }).toBuffer();
-  return { base64: resized.toString('base64'), mimeType: 'image/jpeg' };
-}
 
 export async function extractImage(content: string, userTitle?: string): Promise<ExtractionResult> {
   let base64Data: string;
@@ -475,32 +425,13 @@ export async function extractImage(content: string, userTitle?: string): Promise
   const { detectMimeType } = await import('./detect');
   const originalMimeType = detectMimeType(originalBuffer);
 
-  // Prepare smaller version for Claude Vision
-  const vision = await prepareForVision(originalBuffer);
-
-  // Generate description
-  let description: string;
-  try {
-    const response = await getVisionAgent().generate([
-      {
-        role: 'user',
-        content: [
-          { type: 'text', text: 'Describe this image in detail for a personal memory database:' },
-          { type: 'image', image: vision.base64, mimeType: vision.mimeType },
-        ],
-      },
-    ]);
-    description = response.text || 'Image (no description generated)';
-  } catch (e: any) {
-    description = userTitle || `Image (${originalMimeType}) - description unavailable: ${e.message}`;
-  }
-
-  const ext = originalMimeType.split('/')[1] || 'bin';
+  // Store the image via the media table
+  const img = await storeMedia(originalBuffer, originalMimeType);
 
   return {
-    text: description,
-    metadata: { mimeType: originalMimeType, imageDescription: description },
-    files: [{ buffer: originalBuffer, filename: `original.${ext}`, contentType: originalMimeType }],
+    text: userTitle || 'Image',
+    metadata: { mimeType: originalMimeType, mediaId: img.id },
+    localizedImages: [img],
   };
 }
 
