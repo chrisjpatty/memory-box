@@ -7,6 +7,8 @@ import type { MemoryCardData } from './MemoryCard';
 
 interface Props {
   memoryId: string;
+  onClose?: () => void;
+  cardData?: MemoryCardData;
 }
 
 function ActionButton({ onClick, label }: { onClick: () => void; label: string }) {
@@ -34,40 +36,51 @@ function ActionButton({ onClick, label }: { onClick: () => void; label: string }
 
 type ViewMode = 'markdown' | 'plain' | 'original';
 
-export function MemoryDetail({ memoryId }: Props) {
+export function MemoryDetail({ memoryId, onClose, cardData }: Props) {
   const navigate = useNavigate();
   const { data, isLoading } = useMemory(memoryId);
   const [viewMode, setViewMode] = useState<ViewMode>('markdown');
 
-  if (isLoading) return <div className="text-neutral-500 text-sm py-8 text-center">Loading...</div>;
-
   const memory = data?.found ? data.memory : null;
-  if (!memory) return <div className="text-neutral-500 text-sm py-8 text-center">Memory not found</div>;
+  // Use cardData for immediate hero card rendering while full data loads
+  const heroCard: MemoryCardData | null = memory as MemoryCardData ?? cardData ?? null;
 
-  const rawContent = memory.markdown || memory.processedContent;
-
-  // Clean up markdown for rendering:
-  // Jina Reader often produces linked images with newlines inside brackets, e.g.:
-  //   [\n\n![alt](img)\n\n](link)
-  // Collapse these into proper inline markdown: [![alt](img)](link)
+  const rawContent = memory?.markdown || memory?.processedContent;
   const content = rawContent?.replace(
     /\[\s*(\!\[[^\]]*\]\([^)]*\))\s*\]\(([^)]*)\)/g,
     '[$1]($2)'
   );
 
-  return (
-    <div className="max-w-3xl">
-      <button onClick={() => navigate(-1)} className="text-sm text-neutral-400 hover:text-neutral-200 mb-4 transition-colors">
-        &larr; Back
-      </button>
+  if (!isLoading && !memory) return <div className="text-neutral-500 text-sm py-8 text-center">Memory not found</div>;
 
-      {/* Card rendered as hero */}
-      <div className="max-w-lg mb-6">
-        <MemoryCard memory={memory as MemoryCardData} />
+  const inModal = !!onClose;
+
+  return (
+    <div className={inModal ? '' : 'max-w-3xl'}>
+      {!onClose && (
+        <button onClick={() => navigate(-1)} className="text-sm text-neutral-400 hover:text-neutral-200 mb-4 transition-colors">
+          &larr; Back
+        </button>
+      )}
+
+      {/* Card rendered as hero -- full-width in modal, constrained otherwise */}
+      <div className={inModal ? '' : 'max-w-lg mb-6'}>
+        {heroCard ? (
+          <MemoryCard memory={heroCard} variant={inModal ? 'hero' : undefined} />
+        ) : (
+          <div className="bg-neutral-900 border border-neutral-800 rounded-xl p-4 h-32 animate-pulse" />
+        )}
       </div>
 
+      {/* Content area -- padded when in modal */}
+      <div className={inModal ? 'p-6' : ''}>
+
+      {isLoading && (
+        <div className="text-neutral-500 text-sm py-4 text-center">Loading details...</div>
+      )}
+
       {/* Source link */}
-      {memory.source && (
+      {memory && memory.source && (
         <a
           href={memory.source}
           target="_blank"
@@ -91,7 +104,7 @@ export function MemoryDetail({ memoryId }: Props) {
       )}
 
       {/* Image */}
-      {memory.hasImage && (
+      {memory && memory.hasImage && (
         <div className="bg-neutral-900 border border-neutral-800 rounded-xl p-6 mb-6">
           <img
             src={`/api/memories/${memoryId}/image`}
@@ -125,7 +138,7 @@ export function MemoryDetail({ memoryId }: Props) {
         <div className="bg-neutral-900 border border-neutral-800 rounded-xl p-6">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-xs font-semibold uppercase tracking-wider text-neutral-500">
-              {memory.hasImage ? 'Description' : 'Content'}
+              {memory?.hasImage ? 'Description' : 'Content'}
             </h3>
             <div className="flex items-center gap-2">
               <ActionButton
@@ -181,7 +194,7 @@ export function MemoryDetail({ memoryId }: Props) {
             </div>
           </div>
 
-          {viewMode === 'original' && memory.hasHtml ? (
+          {viewMode === 'original' && memory?.hasHtml ? (
             <div className="rounded-lg overflow-hidden border border-neutral-700">
               <iframe
                 src={`/api/memories/${memoryId}/html`}
@@ -219,6 +232,8 @@ export function MemoryDetail({ memoryId }: Props) {
           )}
         </div>
       )}
+
+      </div>
     </div>
   );
 }

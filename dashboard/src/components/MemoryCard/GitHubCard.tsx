@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { CardShell } from './CardShell';
+import { cn } from '../../lib/cn';
 import type { MemoryCardProps } from './types';
 import { formatDate, formatCount } from './types';
 
@@ -14,7 +15,7 @@ function GitHubLogo() {
 function IssueIcon({ state }: { state?: string }) {
   const color = state === 'closed' ? 'text-red-400' : 'text-emerald-400';
   return (
-    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" className={`${color} shrink-0`}>
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" className={cn(color, 'shrink-0')}>
       <circle cx="8" cy="8" r="6.5" stroke="currentColor" strokeWidth="1.3" />
       <circle cx="8" cy="8" r="1.5" fill="currentColor" />
     </svg>
@@ -24,7 +25,7 @@ function IssueIcon({ state }: { state?: string }) {
 function PRIcon({ state }: { state?: string }) {
   const color = state === 'merged' ? 'text-violet-400' : state === 'closed' ? 'text-red-400' : 'text-emerald-400';
   return (
-    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" className={`${color} shrink-0`}>
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" className={cn(color, 'shrink-0')}>
       <circle cx="5" cy="4" r="2" stroke="currentColor" strokeWidth="1.3" />
       <circle cx="11" cy="12" r="2" stroke="currentColor" strokeWidth="1.3" />
       <path d="M5 6v6M11 4v6" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
@@ -38,7 +39,6 @@ const stateColors: Record<string, string> = {
   merged: 'bg-violet-500/10 text-violet-400 border-violet-500/20',
 };
 
-// Known language colors (subset)
 const langColors: Record<string, string> = {
   TypeScript: 'bg-blue-400',
   JavaScript: 'bg-yellow-400',
@@ -59,19 +59,19 @@ const langColors: Record<string, string> = {
   Zig: 'bg-amber-400',
 };
 
-function GitHubRepoCard({ memory, onDelete }: MemoryCardProps) {
+function GitHubRepoCard({ memory, onDelete, variant }: MemoryCardProps) {
+  const h = variant === 'hero';
   const extra = memory.extra || {};
   const language = extra.language;
   const langDot = langColors[language] || 'bg-neutral-500';
   const [imgFailed, setImgFailed] = useState(false);
+  const hasImage = extra.readmeImage && !imgFailed;
 
   return (
-    <CardShell id={memory.id} onDelete={onDelete}>
-      {/* Subtle background glow */}
+    <CardShell id={memory.id} onDelete={onDelete} variant={variant}>
       <div className="absolute inset-0 rounded-xl pointer-events-none bg-gradient-to-br from-emerald-500/[0.04] to-transparent z-10" />
 
-      {/* README hero image */}
-      {extra.readmeImage && !imgFailed && (
+      {hasImage && (
         <div className="relative aspect-[2.4/1] bg-neutral-800 overflow-hidden">
           <img
             src={extra.readmeImage}
@@ -83,11 +83,14 @@ function GitHubRepoCard({ memory, onDelete }: MemoryCardProps) {
         </div>
       )}
 
-      <div className={extra.readmeImage && !imgFailed ? 'px-4 pb-4 -mt-3 relative' : 'p-4'}>
+      <div className={cn(
+        hasImage && '-mt-3 relative',
+        hasImage ? (h ? 'px-6 pb-6' : 'px-4 pb-4') : (h ? 'p-6' : 'p-4'),
+      )}>
         {/* Repo identity */}
         <div className="flex items-center gap-2.5 mb-2.5">
           <GitHubLogo />
-          <div className="font-mono text-[13px] truncate">
+          <div className={cn('font-mono truncate', h ? 'text-base' : 'text-[13px]')}>
             <span className="text-neutral-500">{extra.owner}/</span>
             <span className="text-neutral-200 font-semibold">{extra.repo}</span>
           </div>
@@ -95,15 +98,15 @@ function GitHubRepoCard({ memory, onDelete }: MemoryCardProps) {
 
         {/* Description */}
         {memory.summary && (
-          <p className="text-xs text-neutral-400 line-clamp-2 mb-3 leading-relaxed pl-[26px]">
+          <p className={cn('text-neutral-400 line-clamp-2 mb-3 leading-relaxed pl-[26px]', h ? 'text-sm' : 'text-xs')}>
             {memory.summary}
           </p>
         )}
 
         {/* Stats row */}
-        <div className="flex items-center gap-4 pl-[26px] mb-3">
+        <div className={cn('flex items-center gap-4 pl-[26px] mb-3', h ? 'text-sm' : 'text-[11px]')}>
           {extra.stars && extra.stars !== '0' && (
-            <div className="flex items-center gap-1 text-[11px] text-neutral-400">
+            <div className="flex items-center gap-1 text-neutral-400">
               <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor" className="text-amber-500/70">
                 <path d="M8 .25a.75.75 0 01.673.418l1.882 3.815 4.21.612a.75.75 0 01.416 1.279l-3.046 2.97.719 4.192a.75.75 0 01-1.088.791L8 12.347l-3.766 1.98a.75.75 0 01-1.088-.79l.72-4.194L.818 6.374a.75.75 0 01.416-1.28l4.21-.611L7.327.668A.75.75 0 018 .25z" />
               </svg>
@@ -111,7 +114,7 @@ function GitHubRepoCard({ memory, onDelete }: MemoryCardProps) {
             </div>
           )}
           {extra.forks && extra.forks !== '0' && (
-            <div className="flex items-center gap-1 text-[11px] text-neutral-400">
+            <div className="flex items-center gap-1 text-neutral-400">
               <svg width="11" height="11" viewBox="0 0 16 16" fill="currentColor" className="text-neutral-500">
                 <path d="M5 3.25a.75.75 0 11-1.5 0 .75.75 0 011.5 0zm0 2.122a2.25 2.25 0 10-1.5 0v.878A2.25 2.25 0 005.75 8.5h1.5v2.128a2.251 2.251 0 101.5 0V8.5h1.5a2.25 2.25 0 002.25-2.25v-.878a2.25 2.25 0 10-1.5 0v.878a.75.75 0 01-.75.75h-4.5A.75.75 0 015 6.25v-.878zm3.75 7.378a.75.75 0 11-1.5 0 .75.75 0 011.5 0zm3-8.75a.75.75 0 100-1.5.75.75 0 000 1.5z" />
               </svg>
@@ -119,8 +122,8 @@ function GitHubRepoCard({ memory, onDelete }: MemoryCardProps) {
             </div>
           )}
           {language && (
-            <div className="flex items-center gap-1.5 text-[11px] text-neutral-400">
-              <span className={`w-2 h-2 rounded-full ${langDot}`} />
+            <div className="flex items-center gap-1.5 text-neutral-400">
+              <span className={cn('w-2 h-2 rounded-full', langDot)} />
               <span>{language}</span>
             </div>
           )}
@@ -136,13 +139,16 @@ function GitHubRepoCard({ memory, onDelete }: MemoryCardProps) {
                   {topics.slice(0, 4).map((t) => (
                     <span
                       key={t}
-                      className="px-1.5 py-0.5 rounded bg-emerald-500/[0.06] text-[9px] text-emerald-400/50 border border-emerald-500/10"
+                      className={cn(
+                        'px-1.5 py-0.5 rounded bg-emerald-500/[0.06] text-emerald-400/50 border border-emerald-500/10',
+                        h ? 'text-[11px]' : 'text-[9px]',
+                      )}
                     >
                       {t}
                     </span>
                   ))}
                   {topics.length > 4 && (
-                    <span className="text-[9px] text-neutral-600 self-center">
+                    <span className={cn('text-neutral-600 self-center', h ? 'text-[11px]' : 'text-[9px]')}>
                       +{topics.length - 4}
                     </span>
                   )}
@@ -153,7 +159,7 @@ function GitHubRepoCard({ memory, onDelete }: MemoryCardProps) {
         )}
 
         {/* Date */}
-        <div className="pl-[26px] text-[10px] text-neutral-600">
+        <div className={cn('pl-[26px] text-neutral-600', h ? 'text-xs' : 'text-[10px]')}>
           {formatDate(memory.createdAt)}
         </div>
       </div>
@@ -161,36 +167,36 @@ function GitHubRepoCard({ memory, onDelete }: MemoryCardProps) {
   );
 }
 
-function GitHubIssueCard({ memory, onDelete }: MemoryCardProps) {
+function GitHubIssueCard({ memory, onDelete, variant }: MemoryCardProps) {
+  const h = variant === 'hero';
   const extra = memory.extra || {};
   const isPR = extra.githubType === 'pull-request';
   const Icon = isPR ? PRIcon : IssueIcon;
   const stateColor = stateColors[extra.state] || stateColors.open;
 
   return (
-    <CardShell id={memory.id} onDelete={onDelete}>
-      {/* Subtle background glow */}
+    <CardShell id={memory.id} onDelete={onDelete} variant={variant}>
       <div className="absolute inset-0 rounded-xl pointer-events-none bg-gradient-to-br from-emerald-500/[0.04] to-transparent" />
 
-      <div className="p-4">
+      <div className={cn(h ? 'p-6' : 'p-4')}>
         {/* Repo + number reference */}
         <div className="flex items-center gap-2 mb-2">
           <Icon state={extra.state} />
-          <span className="font-mono text-[11px] text-neutral-500 truncate">
+          <span className={cn('font-mono text-neutral-500 truncate', h ? 'text-sm' : 'text-[11px]')}>
             {extra.owner}/{extra.repo}#{extra.number}
           </span>
-          <span className={`ml-auto px-2 py-0.5 rounded-full text-[9px] font-semibold border ${stateColor}`}>
+          <span className={cn('ml-auto px-2 py-0.5 rounded-full font-semibold border', stateColor, h ? 'text-[11px]' : 'text-[9px]')}>
             {extra.state}
           </span>
         </div>
 
         {/* Title */}
-        <h3 className="text-sm font-medium text-neutral-200 line-clamp-2 mb-2 pl-[26px] leading-snug">
+        <h3 className={cn('font-medium text-neutral-200 line-clamp-2 mb-2 pl-[26px] leading-snug', h ? 'text-lg' : 'text-sm')}>
           {memory.title}
         </h3>
 
         {/* Meta row */}
-        <div className="flex items-center gap-3 pl-[26px] mb-2 text-[11px] text-neutral-500">
+        <div className={cn('flex items-center gap-3 pl-[26px] mb-2 text-neutral-500', h ? 'text-sm' : 'text-[11px]')}>
           {extra.author && (
             <span>by <span className="text-neutral-400">{extra.author}</span></span>
           )}
@@ -206,7 +212,7 @@ function GitHubIssueCard({ memory, onDelete }: MemoryCardProps) {
 
         {/* PR diff stats */}
         {isPR && (extra.additions || extra.deletions) && (
-          <div className="flex items-center gap-2.5 pl-[26px] mb-2 text-[11px] font-mono">
+          <div className={cn('flex items-center gap-2.5 pl-[26px] mb-2 font-mono', h ? 'text-sm' : 'text-[11px]')}>
             {extra.additions && extra.additions !== '0' && (
               <span className="text-emerald-400/70">+{extra.additions}</span>
             )}
@@ -225,7 +231,10 @@ function GitHubIssueCard({ memory, onDelete }: MemoryCardProps) {
             {extra.labels.split(', ').filter(Boolean).map((l) => (
               <span
                 key={l}
-                className="px-1.5 py-0.5 rounded bg-neutral-800 text-[9px] text-neutral-400 border border-neutral-700/50"
+                className={cn(
+                  'px-1.5 py-0.5 rounded bg-neutral-800 text-neutral-400 border border-neutral-700/50',
+                  h ? 'text-[11px]' : 'text-[9px]',
+                )}
               >
                 {l}
               </span>
@@ -234,7 +243,7 @@ function GitHubIssueCard({ memory, onDelete }: MemoryCardProps) {
         )}
 
         {/* Date */}
-        <div className="pl-[26px] text-[10px] text-neutral-600">
+        <div className={cn('pl-[26px] text-neutral-600', h ? 'text-xs' : 'text-[10px]')}>
           {formatDate(memory.createdAt)}
         </div>
       </div>

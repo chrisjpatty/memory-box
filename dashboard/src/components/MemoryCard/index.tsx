@@ -9,25 +9,25 @@ import { FileCard } from './FileCard';
 
 export type { MemoryCardData, MemoryCardProps };
 
-export function MemoryCard({ memory, onDelete }: MemoryCardProps) {
+export function MemoryCard({ memory, onDelete, variant }: MemoryCardProps) {
+  const props = { memory, onDelete, variant };
   switch (memory.contentType) {
     case 'tweet':
-      return <TweetCard memory={memory} onDelete={onDelete} />;
+      return <TweetCard {...props} />;
     case 'github':
-      return <GitHubCard memory={memory} onDelete={onDelete} />;
+      return <GitHubCard {...props} />;
     case 'url':
-      // Legacy: GitHub/tweet memories stored as 'url' with extra fields
-      if (memory.extra?.githubType) return <GitHubCard memory={memory} onDelete={onDelete} />;
-      if (memory.extra?.tweetId) return <TweetCard memory={memory} onDelete={onDelete} />;
-      return <URLCard memory={memory} onDelete={onDelete} />;
+      if (memory.extra?.githubType) return <GitHubCard {...props} />;
+      if (memory.extra?.tweetId) return <TweetCard {...props} />;
+      return <URLCard {...props} />;
     case 'image':
-      return <ImageCard memory={memory} onDelete={onDelete} />;
+      return <ImageCard {...props} />;
     case 'pdf':
-      return <PDFCard memory={memory} onDelete={onDelete} />;
+      return <PDFCard {...props} />;
     case 'file':
-      return <FileCard memory={memory} onDelete={onDelete} />;
+      return <FileCard {...props} />;
     case 'text':
     default:
-      return <TextCard memory={memory} onDelete={onDelete} />;
+      return <TextCard {...props} />;
   }
 }

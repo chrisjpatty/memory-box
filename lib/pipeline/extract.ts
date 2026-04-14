@@ -65,10 +65,10 @@ async function fetchViaJina(url: string): Promise<{
     const headers: Record<string, string> = {
       'Accept': 'application/json',
       'X-Return-Format': 'markdown',
-      'X-With-Generated-Alt': 'true',
     };
     if (process.env.JINA_API_KEY) {
       headers['Authorization'] = `Bearer ${process.env.JINA_API_KEY}`;
+      headers['X-With-Generated-Alt'] = 'true';
     }
 
     const response = await fetch(`https://r.jina.ai/${url}`, {

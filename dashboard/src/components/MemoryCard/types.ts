@@ -14,9 +14,12 @@ export interface MemoryCardData {
   extra?: Record<string, string>;
 }
 
+export type CardVariant = 'default' | 'hero';
+
 export interface MemoryCardProps {
   memory: MemoryCardData;
   onDelete?: (id: string) => void;
+  variant?: CardVariant;
 }
 
 export function extractDomain(url: string): string {

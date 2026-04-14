@@ -1,4 +1,5 @@
 import { CardShell } from './CardShell';
+import { cn } from '../../lib/cn';
 import type { MemoryCardProps } from './types';
 
 function XLogo({ className = '' }: { className?: string }) {
@@ -40,48 +41,54 @@ function formatStat(n: string | undefined): string | null {
   return String(num);
 }
 
-function MediaGrid({ urls }: { urls: string[] }) {
+function MediaGrid({ urls, hero }: { urls: string[]; hero?: boolean }) {
   const count = urls.length;
-  const img = (src: string, className: string) => (
-    <img src={src} alt="" className={`object-cover w-full h-full ${className}`} />
-  );
 
   if (count === 1) {
     return (
       <div className="rounded-xl overflow-hidden border border-neutral-800 mb-2.5">
-        {img(urls[0], 'max-h-[200px]')}
+        <img
+          src={urls[0]}
+          alt=""
+          className={cn('w-full', hero ? 'max-h-[500px] object-contain' : 'max-h-[200px] object-cover')}
+        />
       </div>
     );
   }
 
+  const img = (src: string, className?: string) => (
+    <img src={src} alt="" className={cn('object-cover w-full h-full', className)} />
+  );
+
   if (count === 2) {
     return (
-      <div className="grid grid-cols-2 gap-0.5 rounded-xl overflow-hidden border border-neutral-800 mb-2.5 h-[180px]">
-        {img(urls[0], '')}
-        {img(urls[1], '')}
+      <div className={cn('grid grid-cols-2 gap-0.5 rounded-xl overflow-hidden border border-neutral-800 mb-2.5', hero ? 'h-[280px]' : 'h-[180px]')}>
+        {img(urls[0])}
+        {img(urls[1])}
       </div>
     );
   }
 
   if (count === 3) {
     return (
-      <div className="grid grid-cols-2 gap-0.5 rounded-xl overflow-hidden border border-neutral-800 mb-2.5 h-[200px]">
+      <div className={cn('grid grid-cols-2 gap-0.5 rounded-xl overflow-hidden border border-neutral-800 mb-2.5', hero ? 'h-[300px]' : 'h-[200px]')}>
         <div className="row-span-2">{img(urls[0], 'h-full')}</div>
-        {img(urls[1], '')}
-        {img(urls[2], '')}
+        {img(urls[1])}
+        {img(urls[2])}
       </div>
     );
   }
 
   // 4+
   return (
-    <div className="grid grid-cols-2 grid-rows-2 gap-0.5 rounded-xl overflow-hidden border border-neutral-800 mb-2.5 h-[220px]">
+    <div className={cn('grid grid-cols-2 grid-rows-2 gap-0.5 rounded-xl overflow-hidden border border-neutral-800 mb-2.5', hero ? 'h-[320px]' : 'h-[220px]')}>
       {urls.slice(0, 4).map((url, i) => img(url, i === 0 ? '' : ''))}
     </div>
   );
 }
 
-export function TweetCard({ memory, onDelete }: MemoryCardProps) {
+export function TweetCard({ memory, onDelete, variant }: MemoryCardProps) {
+  const h = variant === 'hero';
   const extra = memory.extra || {};
   const authorName = extra.authorName || extra.author || 'Unknown';
   const handle = extra.handle || extra.author || 'user';
@@ -96,11 +103,10 @@ export function TweetCard({ memory, onDelete }: MemoryCardProps) {
   const views = formatStat(extra.views);
 
   return (
-    <CardShell id={memory.id} onDelete={onDelete}>
-      {/* Subtle background glow */}
+    <CardShell id={memory.id} onDelete={onDelete} variant={variant}>
       <div className="absolute inset-0 rounded-xl pointer-events-none bg-gradient-to-br from-blue-500/[0.04] to-transparent" />
 
-      <div className="p-4">
+      <div className={cn('p-4', h && 'p-6')}>
         {/* Author row */}
         <div className="flex items-start gap-2.5">
           {/* Avatar */}
@@ -119,15 +125,15 @@ export function TweetCard({ memory, onDelete }: MemoryCardProps) {
           <div className="flex-1 min-w-0">
             {/* Name + handle + timestamp */}
             <div className="flex items-center gap-1 mb-0.5">
-              <span className="text-[13px] font-bold text-neutral-200 truncate">
+              <span className={cn('font-bold text-neutral-200 truncate', h ? 'text-base' : 'text-[13px]')}>
                 {authorName}
               </span>
               {verified && <VerifiedBadge />}
-              <span className="text-[12px] text-neutral-600 truncate">
+              <span className={cn('text-neutral-600 truncate', h ? 'text-sm' : 'text-[12px]')}>
                 @{handle}
               </span>
-              <span className="text-neutral-700 text-[12px]">&middot;</span>
-              <span className="text-[12px] text-neutral-600 shrink-0">
+              <span className={cn('text-neutral-700', h ? 'text-sm' : 'text-[12px]')}>&middot;</span>
+              <span className={cn('text-neutral-600 shrink-0', h ? 'text-sm' : 'text-[12px]')}>
                 {formatTweetDate(memory.createdAt)}
               </span>
               {/* X logo */}
@@ -135,13 +141,13 @@ export function TweetCard({ memory, onDelete }: MemoryCardProps) {
             </div>
 
             {/* Tweet body */}
-            <p className="text-[13px] text-neutral-300 leading-[1.4] whitespace-pre-line mb-2.5">
+            <p className={cn('text-neutral-300 leading-[1.4] whitespace-pre-line mb-2.5', h ? 'text-base' : 'text-[13px]')}>
               {tweetText}
             </p>
 
             {/* Attached media */}
             {mediaUrls.length > 0 && (
-              <MediaGrid urls={mediaUrls} />
+              <MediaGrid urls={mediaUrls} hero={h} />
             )}
 
             {/* Engagement stats */}
@@ -151,7 +157,7 @@ export function TweetCard({ memory, onDelete }: MemoryCardProps) {
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="group-hover/stat:text-blue-400 transition-colors">
                   <path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
-                {replies && <span className="text-[11px]">{replies}</span>}
+                {replies && <span className={cn(h ? 'text-sm' : 'text-[11px]')}>{replies}</span>}
               </div>
 
               {/* Retweets */}
@@ -162,7 +168,7 @@ export function TweetCard({ memory, onDelete }: MemoryCardProps) {
                   <path d="M7 23l-4-4 4-4" strokeLinecap="round" strokeLinejoin="round" />
                   <path d="M21 13v2a4 4 0 01-4 4H3" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
-                {retweets && <span className="text-[11px]">{retweets}</span>}
+                {retweets && <span className={cn(h ? 'text-sm' : 'text-[11px]')}>{retweets}</span>}
               </div>
 
               {/* Likes */}
@@ -170,7 +176,7 @@ export function TweetCard({ memory, onDelete }: MemoryCardProps) {
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="group-hover/stat:text-pink-500 transition-colors">
                   <path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
-                {likes && <span className="text-[11px]">{likes}</span>}
+                {likes && <span className={cn(h ? 'text-sm' : 'text-[11px]')}>{likes}</span>}
               </div>
 
               {/* Views */}
@@ -179,7 +185,7 @@ export function TweetCard({ memory, onDelete }: MemoryCardProps) {
                   <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z" />
                   <circle cx="12" cy="12" r="3" />
                 </svg>
-                {views && <span className="text-[11px]">{views}</span>}
+                {views && <span className={cn(h ? 'text-sm' : 'text-[11px]')}>{views}</span>}
               </div>
             </div>
           </div>
@@ -191,13 +197,13 @@ export function TweetCard({ memory, onDelete }: MemoryCardProps) {
             {memory.tags.slice(0, 3).map((tag) => (
               <span
                 key={tag}
-                className="px-1.5 py-0.5 rounded bg-blue-500/[0.06] text-[9px] text-blue-400/50 border border-blue-500/10"
+                className={cn('px-1.5 py-0.5 rounded bg-blue-500/[0.06] text-blue-400/50 border border-blue-500/10', h ? 'text-[11px]' : 'text-[9px]')}
               >
                 {tag}
               </span>
             ))}
             {memory.tags.length > 3 && (
-              <span className="text-[9px] text-neutral-600 self-center">
+              <span className={cn('text-neutral-600 self-center', h ? 'text-[11px]' : 'text-[9px]')}>
                 +{memory.tags.length - 3}
               </span>
             )}

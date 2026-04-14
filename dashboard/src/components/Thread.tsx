@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, type KeyboardEvent } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import Masonry from 'react-masonry-css';
 import { Streamdown } from 'streamdown';
 import 'streamdown/styles.css';
@@ -198,6 +198,7 @@ function ToolStrip({ tools }: { tools: ToolCallPart[] }) {
 }
 
 function DisplayedMemories({ tools }: { tools: ToolCallPart[] }) {
+  const location = useLocation();
   const memories: MemoryCardData[] = tools
     .filter((t) => t.toolName === 'displayMemories' && t.done && t.output != null && !(t.output as any).error)
     .flatMap((t) => {
@@ -235,7 +236,7 @@ function DisplayedMemories({ tools }: { tools: ToolCallPart[] }) {
           columnClassName="pl-2 bg-clip-padding"
         >
           {memories.map((m) => (
-            <Link key={m.id} to={`/memories/${m.id}`} className="block mb-3">
+            <Link key={m.id} to={`/memories/${m.id}`} state={{ backgroundLocation: location }} className="block mb-3">
               <MemoryCard memory={m} />
             </Link>
           ))}

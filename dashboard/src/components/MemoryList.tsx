@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import Masonry from 'react-masonry-css';
 import { useInfiniteMemories, useSearch, useDeleteMemory } from '../hooks/queries';
 import { MemoryCard } from './MemoryCard';
@@ -28,6 +28,15 @@ interface MemoryListProps {
 }
 
 export function MemoryList({ searchQuery, typeFilters, onCountChange }: MemoryListProps) {
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  const handleCardClick = useCallback((e: React.MouseEvent, memory: MemoryCardData) => {
+    e.preventDefault();
+    navigate(`/memories/${memory.id}`, {
+      state: { backgroundLocation: location, cardData: memory },
+    });
+  }, [location, navigate]);
   const [searchResults, setSearchResults] = useState<MemoryCardData[] | null>(null);
   const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
@@ -129,9 +138,14 @@ export function MemoryList({ searchQuery, typeFilters, onCountChange }: MemoryLi
           columnClassName="pl-2 bg-clip-padding"
         >
           {memories.map((m) => (
-            <Link key={m.id} to={`/memories/${m.id}`} className="block mb-4">
+            <a
+              key={m.id}
+              href={`/memories/${m.id}`}
+              onClick={(e) => handleCardClick(e, m)}
+              className="block mb-4 cursor-pointer"
+            >
               <MemoryCard memory={m} onDelete={handleDelete} />
-            </Link>
+            </a>
           ))}
         </Masonry>
       )}
