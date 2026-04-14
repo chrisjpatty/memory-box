@@ -18,7 +18,7 @@ integrations:
 ---
 
 <div align="center">
-  <img src="https://i.ibb.co/3mWMZKJG/logo.png" alt="Memory Box" border="0" width="200">
+  <img src="https://i.ibb.co/zWGbfXJP/logo.png" alt="Memory Box" border="0" width="200">
 </div>
 
 <h2 align="center">memory-box</h2>
