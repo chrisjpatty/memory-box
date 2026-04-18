@@ -8,6 +8,11 @@ import pgvector from 'pgvector';
 import { query } from './db';
 import { getEmbeddingProvider } from './pipeline/embed';
 
+export interface SearchOptions {
+  limit?: number;
+  collectionId?: number;
+}
+
 interface SearchHit {
   memoryId: string;
   title: string;
@@ -21,13 +26,18 @@ interface SearchHit {
   source?: string;
   hasImage?: boolean;
   extra?: Record<string, string>;
+  collectionIds?: number[];
 }
 
 /**
  * Vector search via pgvector embeddings.
  */
-async function vectorSearch(queryText: string, limit: number): Promise<SearchHit[]> {
+async function vectorSearch(queryText: string, limit: number, collectionId?: number): Promise<SearchHit[]> {
   const queryEmbedding = await getEmbeddingProvider().embedOne(queryText);
+
+  const collectionJoin = collectionId
+    ? `JOIN collection_memories cm ON cm.memory_id = mc.memory_id AND cm.collection_id = ${collectionId}`
+    : '';
 
   const result = await query(
     `SELECT * FROM (
@@ -38,6 +48,7 @@ async function vectorSearch(queryText: string, limit: number): Promise<SearchHit
          m.created_at, m.source_url, m.metadata, m.file_key
        FROM memory_chunks mc
        JOIN memories m ON m.id = mc.memory_id
+       ${collectionJoin}
        ORDER BY mc.memory_id, mc.embedding <=> $1::vector
      ) sub
      ORDER BY score DESC
@@ -66,14 +77,19 @@ async function vectorSearch(queryText: string, limit: number): Promise<SearchHit
 /**
  * Keyword search via Postgres fulltext (tsvector/tsquery).
  */
-async function keywordSearch(queryText: string, limit: number): Promise<SearchHit[]> {
+async function keywordSearch(queryText: string, limit: number, collectionId?: number): Promise<SearchHit[]> {
   try {
+    const collectionJoin = collectionId
+      ? `JOIN collection_memories cm ON cm.memory_id = m.id AND cm.collection_id = ${collectionId}`
+      : '';
+
     const result = await query(
       `SELECT m.id AS memory_id, m.title, m.content_type, m.summary, m.tags,
               m.category, m.created_at, m.source_url, m.metadata, m.file_key,
               LEFT(m.search_content, 300) AS snippet,
               ts_rank(m.search_vector, plainto_tsquery('english', $1)) AS score
        FROM memories m
+       ${collectionJoin}
        WHERE m.search_vector @@ plainto_tsquery('english', $1)
        ORDER BY score DESC
        LIMIT $2`,
@@ -134,13 +150,18 @@ function reciprocalRankFusion(
  * Hybrid search: combines semantic vector search with keyword fulltext search
  * using Reciprocal Rank Fusion for the final ranking.
  */
-export async function hybridSearch(queryText: string, limit = 5): Promise<{
+export async function hybridSearch(
+  queryText: string,
+  options: SearchOptions = {},
+): Promise<{
   results: SearchHit[];
   totalFound: number;
 }> {
+  const limit = options.limit ?? 5;
+
   const [vectorHits, keywordHits] = await Promise.all([
-    vectorSearch(queryText, limit * 2),
-    keywordSearch(queryText, limit * 2),
+    vectorSearch(queryText, limit * 2, options.collectionId),
+    keywordSearch(queryText, limit * 2, options.collectionId),
   ]);
 
   const merged = reciprocalRankFusion(vectorHits, keywordHits);
