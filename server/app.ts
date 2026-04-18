@@ -11,6 +11,7 @@ import { search } from './api/search';
 import { ingestApi } from './api/ingest';
 import { importApi } from './api/import';
 import { chat } from './api/chat';
+import { collections } from './api/collections';
 import { conversations } from './api/conversations';
 import { jobsApi } from './api/jobs';
 import { createMcpHandler } from '../mcp/server';
@@ -61,6 +62,7 @@ export function createApp(options?: AppOptions) {
   app.route('/api/token', token);
   app.route('/api/stats', stats);
   app.route('/api/memories', memories);
+  app.route('/api/collections', collections);
   app.route('/api/search', search);
   app.route('/api/ingest', ingestApi);
   app.route('/api/import', importApi);

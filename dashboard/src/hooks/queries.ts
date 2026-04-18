@@ -17,6 +17,10 @@ export const queryKeys = {
   syncStatus: ['github', 'sync'] as const,
   twitterStatus: ['twitter', 'status'] as const,
   mcpStatus: ['mcp', 'status'] as const,
+  collections: ['collections'] as const,
+  collection: (id: number) => ['collections', id] as const,
+  collectionMemories: (id: number, params?: { limit?: number; skip?: number }) =>
+    ['collections', id, 'memories', params ?? {}] as const,
   activeJob: (type: string) => ['jobs', 'active', type] as const,
   jobStatus: (jobId: string) => ['jobs', jobId] as const,
   activeJobs: ['jobs', 'active'] as const,
@@ -347,6 +351,88 @@ export function useDiscoverTwitterBookmarks() {
 export function useUploadTwitterExport() {
   return useMutation({
     mutationFn: (file: File) => api.uploadTwitterExport(file),
+  });
+}
+
+// --- Collections ---
+
+export function useCollections() {
+  return useQuery({
+    queryKey: queryKeys.collections,
+    queryFn: () => api.listCollections(),
+  });
+}
+
+export function useCollection(id: number) {
+  return useQuery({
+    queryKey: queryKeys.collection(id),
+    queryFn: () => api.getCollection(id),
+    enabled: id > 0,
+  });
+}
+
+export function useCollectionMemories(id: number, params?: { limit?: number; skip?: number }) {
+  return useQuery({
+    queryKey: queryKeys.collectionMemories(id, params),
+    queryFn: () => api.getCollection(id, params),
+    enabled: id > 0,
+  });
+}
+
+export function useCreateCollection() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: { name: string; description?: string; color?: string }) =>
+      api.createCollection(data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.collections });
+    },
+  });
+}
+
+export function useUpdateCollection() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...data }: { id: number; name?: string; description?: string; color?: string }) =>
+      api.updateCollection(id, data),
+    onSuccess: (_, variables) => {
+      qc.invalidateQueries({ queryKey: queryKeys.collections });
+      qc.invalidateQueries({ queryKey: queryKeys.collection(variables.id) });
+    },
+  });
+}
+
+export function useDeleteCollection() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => api.deleteCollection(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.collections });
+    },
+  });
+}
+
+export function useAddMemoriesToCollection() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ collectionId, memoryIds }: { collectionId: number; memoryIds: string[] }) =>
+      api.addMemoriesToCollection(collectionId, memoryIds),
+    onSuccess: (_, variables) => {
+      qc.invalidateQueries({ queryKey: queryKeys.collections });
+      qc.invalidateQueries({ queryKey: queryKeys.collection(variables.collectionId) });
+    },
+  });
+}
+
+export function useRemoveMemoryFromCollection() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ collectionId, memoryId }: { collectionId: number; memoryId: string }) =>
+      api.removeMemoryFromCollection(collectionId, memoryId),
+    onSuccess: (_, variables) => {
+      qc.invalidateQueries({ queryKey: queryKeys.collections });
+      qc.invalidateQueries({ queryKey: queryKeys.collection(variables.collectionId) });
+    },
   });
 }
 

@@ -2,6 +2,7 @@ import { useRef, useEffect, useState, useCallback, type ComponentType, type Mous
 import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { ChatCircleIcon as ChatCircle } from '@phosphor-icons/react/dist/icons/ChatCircle';
 import { CubeIcon as Cube } from '@phosphor-icons/react/dist/icons/Cube';
+import { FolderIcon as FolderIcon } from '@phosphor-icons/react/dist/icons/Folder';
 import { GearSixIcon as GearSix } from '@phosphor-icons/react/dist/icons/GearSix';
 import { PlusIcon as Plus } from '@phosphor-icons/react/dist/icons/Plus';
 import { ListIcon as List } from '@phosphor-icons/react/dist/icons/List';
@@ -14,6 +15,7 @@ import { SettingsNav } from '../pages/settings/SettingsLayout';
 const modes: { to: string; label: string; icon: ComponentType<IconProps>; activeColor: string }[] = [
   { to: '/chat', label: 'Chat', icon: ChatCircle, activeColor: 'text-blue-200' },
   { to: '/memories', label: 'Memories', icon: Cube, activeColor: 'text-green-200' },
+  { to: '/collections', label: 'Collections', icon: FolderIcon, activeColor: 'text-amber-200' },
   { to: '/settings', label: 'Settings', icon: GearSix, activeColor: 'text-neutral-200' },
 ];
 
@@ -29,9 +31,10 @@ export function AppShell() {
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const isMemories = pathname.startsWith('/memories');
+  const isCollections = pathname.startsWith('/collections');
   const isChat = pathname.startsWith('/chat');
   const isSettings = pathname.startsWith('/settings');
-  const showOverlay = isMemories || isChat;
+  const showOverlay = isMemories || isCollections || isChat;
 
   // Mobile header label
   const activeModeIdx = getNavIndex(pathname);
@@ -107,7 +110,7 @@ export function AppShell() {
     <div className="h-screen overflow-hidden">
       {/* Blur + gradient overlay behind header */}
       {showOverlay && (
-        <div className={`fixed top-0 left-0 right-0 z-[15] pointer-events-none ${isMemories ? 'h-32' : 'h-24'}`}>
+        <div className={`fixed top-0 left-0 right-0 z-[15] pointer-events-none ${isMemories || isCollections ? 'h-32' : 'h-24'}`}>
           <div
             className="absolute inset-0 backdrop-blur-md"
             style={{ maskImage: 'linear-gradient(to bottom, black 50%, transparent)', WebkitMaskImage: 'linear-gradient(to bottom, black 50%, transparent)' }}
@@ -145,6 +148,19 @@ export function AppShell() {
               >
                 <Cube size={16} weight="bold" />
                 Memories
+              </NavLink>
+
+              {/* Collections — direct link */}
+              <NavLink
+                to="/collections"
+                className={({ isActive }) =>
+                  `flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-base font-semibold tracking-tight transition-colors ${
+                    isActive ? 'text-amber-200' : 'text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800/50'
+                  }`
+                }
+              >
+                <FolderIcon size={16} weight="bold" />
+                Collections
               </NavLink>
 
               {/* Chat — accordion */}

@@ -44,6 +44,29 @@ export const api = {
 
   search: (query: string, limit?: number) => request<{ results: any[] }>('/api/search', { method: 'POST', body: JSON.stringify({ query, limit }) }),
 
+  // Collections
+  listCollections: () =>
+    request<{ collections: any[] }>('/api/collections'),
+  createCollection: (data: { name: string; description?: string; color?: string }) =>
+    request<any>('/api/collections', { method: 'POST', body: JSON.stringify(data) }),
+  getCollection: (id: number, params?: { limit?: number; skip?: number }) => {
+    const qs = new URLSearchParams();
+    if (params?.limit) qs.set('limit', String(params.limit));
+    if (params?.skip) qs.set('skip', String(params.skip));
+    const query = qs.toString();
+    return request<{ collection: any; memories: any[]; total: number }>(`/api/collections/${id}${query ? `?${query}` : ''}`);
+  },
+  updateCollection: (id: number, data: { name?: string; description?: string; color?: string }) =>
+    request<any>(`/api/collections/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteCollection: (id: number) =>
+    request<{ success: boolean; message: string }>(`/api/collections/${id}`, { method: 'DELETE' }),
+  addMemoriesToCollection: (id: number, memoryIds: string[]) =>
+    request<{ success: boolean; added: number }>(`/api/collections/${id}/memories`, { method: 'POST', body: JSON.stringify({ memoryIds }) }),
+  removeMemoryFromCollection: (id: number, memoryId: string) =>
+    request<{ success: boolean }>(`/api/collections/${id}/memories/${memoryId}`, { method: 'DELETE' }),
+  exportCollection: (id: number) =>
+    request<any>(`/api/collections/${id}/export`),
+
   ingest: (data: { content: string; title?: string; tags?: string[] }) =>
     request<{ success: boolean; memoryId: string; contentType: string; title: string; chunks: number }>('/api/ingest', { method: 'POST', body: JSON.stringify(data) }),
 
