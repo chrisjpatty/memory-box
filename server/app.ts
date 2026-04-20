@@ -11,6 +11,7 @@ import { search } from './api/search';
 import { ingestApi } from './api/ingest';
 import { importApi } from './api/import';
 import { chat } from './api/chat';
+import { collections } from './api/collections';
 import { conversations } from './api/conversations';
 import { jobsApi } from './api/jobs';
 import { createMcpHandler } from '../mcp/server';
@@ -61,6 +62,7 @@ export function createApp(options?: AppOptions) {
   app.route('/api/token', token);
   app.route('/api/stats', stats);
   app.route('/api/memories', memories);
+  app.route('/api/collections', collections);
   app.route('/api/search', search);
   app.route('/api/ingest', ingestApi);
   app.route('/api/import', importApi);
@@ -73,20 +75,7 @@ export function createApp(options?: AppOptions) {
 
   // --- Ingestion routes (bearer token auth) ---
 
-  const bearerAuth = async (c: any, next: any) => {
-    const authHeader = c.req.header('Authorization');
-    const resourceMetadataUrl = `${new URL(c.req.url).origin}/.well-known/oauth-protected-resource`;
-    const wwwAuth = { 'WWW-Authenticate': `Bearer resource_metadata="${resourceMetadataUrl}"` };
-    if (!authHeader?.startsWith('Bearer ')) {
-      return c.json({ error: 'Missing or invalid Authorization header' }, 401, wwwAuth);
-    }
-    const bearerToken = authHeader.slice(7);
-    const valid = await validateToken(bearerToken);
-    if (!valid) {
-      return c.json({ error: 'Invalid token' }, 401, wwwAuth);
-    }
-    await next();
-  };
+  const bearerAuth = createBearerAuthMiddleware();
 
   app.post('/ingest', bearerAuth, async (c) => {
     const body = await c.req.json<IngestRequest>();
@@ -166,4 +155,30 @@ export function createApp(options?: AppOptions) {
   }
 
   return app;
+}
+
+/**
+ * Creates a reusable bearer token authentication middleware.
+ * Validates the Authorization header against stored API tokens
+ * and returns RFC 6750 compliant error responses.
+ */
+function createBearerAuthMiddleware() {
+  return async (c: any, next: any) => {
+    const authHeader = c.req.header('Authorization');
+    const origin = new URL(c.req.url).origin;
+    const resourceMetadataUrl = `${origin}/.well-known/oauth-protected-resource`;
+    const wwwAuth = { 'WWW-Authenticate': `Bearer resource_metadata="${resourceMetadataUrl}"` };
+
+    if (!authHeader?.startsWith('Bearer ')) {
+      return c.json({ error: 'Missing or invalid Authorization header' }, 401, wwwAuth);
+    }
+
+    const token = authHeader.slice(7);
+    const valid = await validateToken(token);
+    if (!valid) {
+      return c.json({ error: 'Invalid or expired token' }, 401, wwwAuth);
+    }
+
+    await next();
+  };
 }

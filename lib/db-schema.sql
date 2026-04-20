@@ -184,3 +184,29 @@ CREATE TABLE IF NOT EXISTS oauth_refresh_tokens (
   revoked          BOOLEAN DEFAULT FALSE,
   created_at       TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Collections — named groups of memories
+CREATE TABLE IF NOT EXISTS collections (
+  id          SERIAL PRIMARY KEY,
+  name        TEXT NOT NULL UNIQUE,
+  description TEXT,
+  color       TEXT,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+DROP TRIGGER IF EXISTS collections_updated_at ON collections;
+CREATE TRIGGER collections_updated_at
+  BEFORE UPDATE ON collections
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+-- Join table linking collections to memories
+CREATE TABLE IF NOT EXISTS collection_memories (
+  collection_id INTEGER NOT NULL REFERENCES collections(id) ON DELETE CASCADE,
+  memory_id     TEXT NOT NULL REFERENCES memories(id) ON DELETE CASCADE,
+  added_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (collection_id, memory_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_collection_memories_memory ON collection_memories (memory_id);
+CREATE INDEX IF NOT EXISTS idx_collection_memories_collection ON collection_memories (collection_id);

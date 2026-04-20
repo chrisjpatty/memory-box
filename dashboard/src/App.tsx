@@ -9,6 +9,7 @@ import { ImportActivity } from './pages/ImportActivity';
 import { AppShell } from './components/AppShell';
 import { ChatLayout } from './components/ChatLayout';
 import { MemoriesLayout } from './components/MemoriesLayout';
+import { CollectionsLayout } from './components/CollectionsLayout';
 import { ImportLayout } from './components/ImportLayout';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { MemoryModal } from './components/MemoryModal';
@@ -17,6 +18,8 @@ import { General } from './pages/settings/General';
 import { Tokens } from './pages/settings/Tokens';
 import { DangerZone } from './pages/settings/DangerZone';
 import { McpServer } from './pages/settings/McpServer';
+import { Collections } from './pages/Collections';
+import { CollectionDetail } from './pages/CollectionDetail';
 import { OAuthConsent } from './pages/OAuthConsent';
 
 export default function App() {
@@ -38,6 +41,10 @@ export default function App() {
               <Route index element={<Memories />} />
               {/* Direct URL to /memories/:id renders list as background */}
               <Route path=":id" element={<Memories />} />
+            </Route>
+            <Route path="collections" element={<CollectionsLayout />}>
+              <Route index element={<Collections />} />
+              <Route path=":id" element={<CollectionDetail />} />
             </Route>
             <Route path="import" element={<ImportLayout />}>
               <Route index element={<ImportIngest />} />
