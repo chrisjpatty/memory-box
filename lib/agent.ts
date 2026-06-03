@@ -90,7 +90,10 @@ export function createMastra(): Mastra {
 
   const host = process.env.POSTGRES_HOST || 'localhost';
   const port = process.env.POSTGRES_PORT || '5432';
-  const connectionString = `postgresql://postgres:postgres@${host}:${port}/memory_box`;
+  const db = process.env.POSTGRES_DB || 'memory_box';
+  const user = process.env.POSTGRES_USER || 'postgres';
+  const password = process.env.POSTGRES_PASSWORD || 'postgres';
+  const connectionString = `postgresql://${user}:${password}@${host}:${port}/${db}`;
 
   const memory = new Memory({
     storage: new PostgresStore({

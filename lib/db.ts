@@ -5,14 +5,12 @@ let pool: pg.Pool | null = null;
 let typesRegistered = false;
 
 function resolveConnectionConfig(): pg.PoolConfig {
-  const host = process.env.POSTGRES_HOST || 'localhost';
-  const port = parseInt(process.env.POSTGRES_PORT || '5432');
   return {
-    host,
-    port,
-    database: 'memory_box',
-    user: 'postgres',
-    password: 'postgres',
+    host: process.env.POSTGRES_HOST || 'localhost',
+    port: parseInt(process.env.POSTGRES_PORT || '5432'),
+    database: process.env.POSTGRES_DB || 'memory_box',
+    user: process.env.POSTGRES_USER || 'postgres',
+    password: process.env.POSTGRES_PASSWORD || 'postgres',
     max: 10,
   };
 }
