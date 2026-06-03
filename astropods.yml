@@ -27,10 +27,6 @@ models:
 knowledge:
   db:
     provider: postgres
-    inputs:
-      - name: POSTGRES_DB
-        datatype: string
-        default: memory_box
   files:
     container:
       build:
