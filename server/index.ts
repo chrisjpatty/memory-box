@@ -2,10 +2,12 @@ import { createApp } from './app';
 import { initDatabase } from '../lib/db-init';
 import { initJobSystem } from '../lib/jobs/init';
 import { startCleanupJob } from '../lib/oauth';
+import { maybeResetPasswordFromEnv } from '../lib/auth';
 
 const app = createApp();
 
 await initDatabase();
+await maybeResetPasswordFromEnv();
 initJobSystem();
 startCleanupJob();
 

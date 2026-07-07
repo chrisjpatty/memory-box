@@ -70,6 +70,49 @@ export async function setPasswordHash(hash: string): Promise<void> {
   );
 }
 
+export async function clearPasswordHash(): Promise<void> {
+  await query(`DELETE FROM settings WHERE key = $1`, ['password_hash']);
+}
+
+// --- One-shot deploy-triggered password reset ---
+
+const RESET_KEY_ENV = 'PASSWORD_RESET_KEY';
+const RESET_KEY_CONSUMED = 'password_reset_key_used';
+
+/**
+ * Clear the admin password when the PASSWORD_RESET_KEY input holds a value we
+ * haven't acted on yet, so the next login drops to the setup screen.
+ *
+ * The consumed key value is recorded in the settings table, which survives
+ * container restarts. That makes this fire exactly once per *distinct* key
+ * value: restarts, scale-up, and redeploys with the same key are inert, so
+ * there's no sticky flag to remember to turn off. To reset again later, deploy
+ * with a new key value.
+ *
+ * Runs at startup (see server/index.ts) after the database is initialized.
+ */
+export async function maybeResetPasswordFromEnv(): Promise<void> {
+  const key = process.env[RESET_KEY_ENV]?.trim();
+  if (!key) return;
+
+  const result = await query(
+    `SELECT value FROM settings WHERE key = $1`,
+    [RESET_KEY_CONSUMED],
+  );
+  const consumed = result.rows[0]?.value ?? null;
+  if (consumed === key) return;
+
+  await clearPasswordHash();
+  await query(
+    `INSERT INTO settings (key, value, updated_at) VALUES ($1, $2, NOW())
+     ON CONFLICT (key) DO UPDATE SET value = $2, updated_at = NOW()`,
+    [RESET_KEY_CONSUMED, key],
+  );
+  console.log(
+    `[auth] ${RESET_KEY_ENV} consumed — admin password cleared. Setup is required on next login.`,
+  );
+}
+
 export async function generateToken(name: string): Promise<string> {
   const token = nanoid(48);
   const hash = hashToken(token);
