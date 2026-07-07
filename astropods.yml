@@ -7,6 +7,16 @@ agent:
   build:
     context: .
     dockerfile: Dockerfile
+  inputs:
+    # Admin password recovery. Leave empty in normal operation. To reset the
+    # dashboard password, set this to a new, unique value and redeploy: on
+    # startup the stored password is cleared so the next login prompts a fresh
+    # setup. Fires once per distinct value — restarts and redeploys with the
+    # same value are inert, so there is no sticky flag to remember to turn off.
+    - name: PASSWORD_RESET_KEY
+      datatype: string
+      default: ""
+      description: Set to a new unique value and redeploy to clear the admin password (next login prompts setup).
   interfaces:
     frontend: true
     messaging: false
@@ -17,7 +27,6 @@ models:
 knowledge:
   db:
     provider: postgres
-    persistent: true
     inputs:
       - name: POSTGRES_DB
         datatype: string
@@ -29,7 +38,6 @@ knowledge:
         dockerfile: minio.Dockerfile
       port: 9000
       volume: /data
-    persistent: true
   embeddings:
     container:
       image: mindthemath/nomic-embed-v1.5:slim
