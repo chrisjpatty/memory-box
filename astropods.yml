@@ -15,6 +15,7 @@ agent:
     # same value are inert, so there is no sticky flag to remember to turn off.
     - name: PASSWORD_RESET_KEY
       datatype: string
+      optional: true
       default: ""
       description: Set to a new unique value and redeploy to clear the admin password (next login prompts setup).
   interfaces:
