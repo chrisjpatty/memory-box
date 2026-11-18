@@ -21,6 +21,8 @@ export interface Message {
   role: 'user' | 'assistant';
   content: string;
   parts: MessagePart[];
+  /** Set when the response failed; rendered as an error bubble. */
+  error?: string;
 }
 
 function nextWordBoundary(text: string, from: number): number {
@@ -92,6 +94,23 @@ export function useChat(threadId: string, onConversationCreated?: (id: string) =
       });
     }
     return parts;
+  }
+
+  function setAssistantError(error: string) {
+    setMessages((prev) =>
+      prev.map((msg, i) =>
+        i === prev.length - 1 && msg.role === 'assistant' ? { ...msg, error } : msg,
+      ),
+    );
+  }
+
+  async function describeHttpError(response: Response): Promise<string> {
+    if (response.status === 401) return 'Your session has expired. Log in again to keep chatting.';
+    try {
+      const body = await response.json();
+      if (typeof body?.error === 'string') return body.error;
+    } catch { /* non-JSON body */ }
+    return `The chat request failed (HTTP ${response.status}).`;
   }
 
   function flushToState() {
@@ -183,12 +202,14 @@ export function useChat(threadId: string, onConversationCreated?: (id: string) =
       });
 
       if (!response.ok || !response.body) {
-        throw new Error(`Chat request failed: ${response.status}`);
+        setAssistantError(await describeHttpError(response));
+        return;
       }
 
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let buffer = '';
+      let streamError: string | null = null;
 
       while (true) {
         const { done, value } = await reader.read();
@@ -253,6 +274,12 @@ export function useChat(threadId: string, onConversationCreated?: (id: string) =
                   flushToState();
                   break;
 
+                case 'error':
+                  streamError = typeof parsed.errorText === 'string' && parsed.errorText
+                    ? parsed.errorText
+                    : 'Something went wrong generating a response.';
+                  break;
+
                 case 'tool-output-available': {
                   const tool = completedPartsRef.current.find(
                     (p): p is ToolCallPart =>
@@ -279,9 +306,11 @@ export function useChat(threadId: string, onConversationCreated?: (id: string) =
         hasActiveTextRef.current = false;
       }
       flushToState();
+      if (streamError) setAssistantError(streamError);
     } catch (err) {
       if (err instanceof Error && err.name === 'AbortError') return;
       console.error('Chat stream error:', err);
+      setAssistantError("Couldn't reach the server. Check your connection and try again.");
     } finally {
       streamingRef.current = false;
       setIsStreaming(false);
