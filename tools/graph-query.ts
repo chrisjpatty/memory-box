@@ -27,7 +27,7 @@ export const graphQuery = createTool({
   }),
   outputSchema: z.object({
     queryType: z.string(),
-    results: z.array(z.record(z.any())),
+    results: z.array(z.record(z.string(), z.any())),
     summary: z.string(),
   }),
   execute: async ({ queryType, memoryId, tag, category, limit }) => {

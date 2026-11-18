@@ -22,7 +22,7 @@ export const getMemory = createTool({
       rawContent: z.string().optional(),
       processedContent: z.string(),
       markdown: z.string().optional(),
-      extra: z.record(z.any()).optional(),
+      extra: z.record(z.string(), z.any()).optional(),
     }).optional(),
   }),
   execute: async ({ memoryId }) => {

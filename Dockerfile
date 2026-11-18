@@ -3,10 +3,11 @@ FROM oven/bun:1 AS builder
 
 WORKDIR /app
 
-# Install dependencies (workspace requires dashboard/package.json to exist)
-COPY package.json ./
+# Install dependencies from the lockfile so builds are reproducible
+# (workspace requires dashboard/package.json to exist)
+COPY package.json bun.lock ./
 COPY dashboard/package.json ./dashboard/
-RUN bun install
+RUN bun install --frozen-lockfile
 
 # Copy source and build dashboard
 COPY . .
