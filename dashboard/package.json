@@ -17,6 +17,7 @@
     "@radix-ui/react-dialog": "^1.1.15",
     "@tailwindcss/typography": "^0.5.19",
     "@tanstack/react-query": "^5.96.2",
+    "border-beam": "1.4.1",
     "clsx": "^2.1.1",
     "prismjs": "^1.29.0",
     "react": "19.2.5",
