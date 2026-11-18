@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { BorderBeam } from 'border-beam';
 import { useActiveJobs, useJobHistory, useCancelJob, queryKeys } from '../hooks/queries';
 
 interface Job {
@@ -70,6 +71,7 @@ function ActiveJobCard({ job, onCancel }: { job: Job; onCancel: (id: string) => 
   const imported = job.completed - job.skipped - job.failed;
 
   return (
+    <BorderBeam colorVariant="ocean" theme="dark" staticColors strength={0.8} active={job.status === 'running'}>
     <div className="bg-neutral-900 border border-neutral-800 rounded-xl p-5">
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
@@ -111,6 +113,7 @@ function ActiveJobCard({ job, onCancel }: { job: Job; onCancel: (id: string) => 
         </p>
       )}
     </div>
+    </BorderBeam>
   );
 }
 

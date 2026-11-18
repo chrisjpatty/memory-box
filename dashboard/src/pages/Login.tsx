@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuthStatus, useLogin, useSetup } from '../hooks/queries';
+import { BorderBeam } from 'border-beam';
 
 export function Login() {
   const navigate = useNavigate();
@@ -59,6 +60,7 @@ export function Login() {
           </div>
         )}
 
+        <BorderBeam size="pulse-inner" colorVariant="ocean" theme="dark" staticColors strength={0.4}>
         <form onSubmit={handleSubmit} className="bg-neutral-900 border border-neutral-800 rounded-xl p-6">
           <label htmlFor="password" className="block text-sm text-neutral-400 mb-2">
             {isSetup ? 'Password' : 'Admin Password'}
@@ -102,6 +104,7 @@ export function Login() {
             }
           </button>
         </form>
+        </BorderBeam>
       </div>
     </div>
   );
