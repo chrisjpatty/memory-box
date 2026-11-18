@@ -8,6 +8,7 @@ import { MemoryCard, type MemoryCardData } from './MemoryCard';
 import { PaperPlaneTiltIcon as PaperPlaneTilt } from '@phosphor-icons/react/dist/icons/PaperPlaneTilt';
 import { ArrowDownIcon as ArrowDown } from '@phosphor-icons/react/dist/icons/ArrowDown';
 import { ChatCircleIcon as ChatCircle } from '@phosphor-icons/react/dist/icons/ChatCircle';
+import { WarningCircleIcon as WarningCircle } from '@phosphor-icons/react/dist/icons/WarningCircle';
 
 function getToolLabel(toolName: string, args: Record<string, unknown>): { action: string; past: string; detail?: string } {
   switch (toolName) {
@@ -200,6 +201,15 @@ function ToolStrip({ tools }: { tools: ToolCallPart[] }) {
   );
 }
 
+function ErrorBubble({ message }: { message: string }) {
+  return (
+    <div role="alert" className="max-w-[85%] flex items-start gap-2 rounded-2xl px-4 py-3 text-sm leading-relaxed bg-red-950/40 border border-red-900/60 text-red-300">
+      <WarningCircle size={18} weight="bold" className="shrink-0 mt-0.5 text-red-400" />
+      <span>{message}</span>
+    </div>
+  );
+}
+
 function DisplayedMemories({ tools }: { tools: ToolCallPart[] }) {
   const location = useLocation();
   const memories: MemoryCardData[] = tools
@@ -369,7 +379,7 @@ export function Thread({ messages, isLoading, isStreaming, onSend }: ThreadProps
               const hasParts = message.parts.length > 0;
 
               // Show loading spinner if streaming but no parts yet
-              if (!hasParts && isMessageStreaming) {
+              if (!hasParts && !message.error && isMessageStreaming) {
                 return (
                   <div key={message.id} className="flex flex-col items-start gap-2 mb-4">
                     <div className="max-w-[85%] rounded-2xl px-4 py-3 bg-neutral-900 border border-neutral-800">
@@ -443,6 +453,7 @@ export function Thread({ messages, isLoading, isStreaming, onSend }: ThreadProps
 
                     return null;
                   })}
+                  {message.error && <ErrorBubble message={message.error} />}
                 </div>
               );
             })}

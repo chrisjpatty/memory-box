@@ -4,6 +4,7 @@ import { handleChatStream } from '@mastra/ai-sdk';
 import { createUIMessageStreamResponse } from 'ai';
 import { createMastra, AGENT_ID } from '../../lib/agent';
 import { query } from '../../lib/db';
+import { chatErrorMessage } from '../../lib/chat-errors';
 
 export const chat = new Hono();
 
@@ -28,6 +29,10 @@ chat.post('/', async (c) => {
     mastra,
     agentId: AGENT_ID,
     params,
+    onError: (error) => {
+      console.error('[chat] stream error:', error);
+      return chatErrorMessage(error);
+    },
   });
 
   const sseResponse = createUIMessageStreamResponse({ stream });
