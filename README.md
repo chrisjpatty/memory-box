@@ -10,10 +10,10 @@ bun install
 cd dashboard && bun install && cd ..
 
 # Configure secrets (Anthropic API key, admin password)
-ast configure
+ast project configure
 
 # Start everything
-ast dev
+ast project start
 ```
 
 - **Admin dashboard**: http://localhost:3200
@@ -61,7 +61,7 @@ The dashboard is a React SPA with a Hono JSON API backend. For development with 
 
 ```bash
 # Terminal 1: Start Docker services
-ast dev
+ast project start
 
 # Terminal 2: Start the standalone API server
 bun run dev:dashboard
@@ -105,5 +105,5 @@ Configured in `astropods.yml`. Key settings:
 | Cache | Redis | Persistent |
 | Graph DB | Neo4j | Persistent |
 
-Secrets set via `ast configure`:
+Secrets set via `ast project configure`:
 - `ANTHROPIC_API_KEY` — Claude API key

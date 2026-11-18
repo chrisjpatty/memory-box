@@ -26,7 +26,7 @@ const classificationSchema = z.object({
   ).describe('3-7 relevant tags for categorization'),
   category: z.string().default('note').describe('A category like: note, article, bookmark, recipe, reference, reminder, quote, contact, idea, document, report, code'),
   summary: z.string().default('').describe('A 1-2 sentence summary of the content'),
-  metadata: z.record(z.string()).default({}).describe('Any additional structured metadata extracted from the content'),
+  metadata: z.record(z.string(), z.string()).default({}).describe('Any additional structured metadata extracted from the content'),
   // Multiple mode field — populated when mode is 'multiple'
   items: z.array(z.object({
     content: z.string().describe('The exact content string for this item, copied verbatim from the input'),

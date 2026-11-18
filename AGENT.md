@@ -14,7 +14,6 @@ integrations:
   - "anthropic"
   - "github"
   - "twitter"
-  - "ollama"
 ---
 
 <div align="center">

@@ -1,13 +1,28 @@
-# yaml-language-server: $schema=https://astropods.ai/schema/package.json
-spec: package/v1
+# yaml-language-server: $schema=https://astropods.com/schema/package.json
+spec: blueprint/v1
 name: memory-box
-meta:
-  visibility: public
 agent:
   build:
     context: .
     dockerfile: Dockerfile
+  healthcheck:
+    path: /health
+    interval: 10s
+    timeout: 5s
+    retries: 3
   inputs:
+    # Chat model for the dashboard chat and the MCP chat tool. Keep the
+    # options in sync with CHAT_MODELS in lib/models.ts.
+    - name: CHAT_MODEL
+      datatype: string
+      display-as: select
+      options:
+        - claude-opus-5-5
+        - claude-sonnet-5-5
+        - claude-haiku-5-5
+        - claude-fable-5-2
+      default: claude-opus-5-5
+      description: Claude model used for chat. Opus 5.5 is the recommended default; Fable 5.2 is the most capable and most expensive.
     # Admin password recovery. Leave empty in normal operation. To reset the
     # dashboard password, set this to a new, unique value and redeploy: on
     # startup the stored password is cleared so the next login prompts a fresh
@@ -23,14 +38,19 @@ agent:
 models:
   anthropic:
     provider: anthropic
+    models:
+      # Chat (selectable via CHAT_MODEL)
+      - claude-opus-5-5
+      - claude-sonnet-5-5
+      - claude-haiku-5-5
+      - claude-fable-5-2
+      # Ingest pipeline (lib/pipeline/classify.ts, lib/pipeline/vision.ts)
+      - claude-haiku-4-5
+      - claude-sonnet-4-5
 
 knowledge:
   db:
     provider: postgres
-    inputs:
-      - name: POSTGRES_DB
-        datatype: string
-        default: memory_box
   files:
     container:
       build:

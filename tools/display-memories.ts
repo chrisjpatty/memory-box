@@ -26,7 +26,7 @@ export const displayMemories = createTool({
         createdAt: z.string(),
         source: z.string().optional(),
         hasImage: z.boolean(),
-        extra: z.record(z.any()).optional(),
+        extra: z.record(z.string(), z.any()).optional(),
       }),
     ),
   }),

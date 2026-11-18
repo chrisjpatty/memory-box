@@ -1,12 +1,12 @@
 /**
  * Local API server for dashboard development with hot reload.
  *
- * Requires `ast dev` to be running (provides Postgres, MinIO, Ollama).
+ * Requires `ast project start` to be running (provides Postgres, MinIO, embeddings).
  * This script runs the server outside the Docker container so code
  * changes are picked up immediately via bun --watch.
  *
  * Usage:
- *   ast dev              # start infrastructure in one terminal
+ *   ast project start    # start infrastructure in one terminal
  *   bun run dev:dashboard # start this server in another terminal
  *   cd dashboard && bun run dev  # start Vite in a third terminal
  *
@@ -37,11 +37,9 @@ try {
   }
 } catch { /* config not found, rely on manual env */ }
 
-// Host defaults — assumes ast dev is running and exposing services on localhost.
+// Host defaults — assumes ast project start is running and exposing services on localhost.
 process.env.POSTGRES_HOST ??= 'localhost';
 process.env.MINIO_HOST ??= 'localhost';
-process.env.EMBEDDING_HOST ??= 'localhost';
-process.env.EMBEDDING_PORT ??= '8089';
 
 const app = createApp({
   corsOrigins: ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175'],
@@ -54,7 +52,7 @@ startCleanupJob();
 
 const port = parseInt(process.env.PORT || '3002', 10);
 console.log(`\n  Dashboard API server: http://localhost:${port}`);
-console.log(`  Requires ast dev to be running for Postgres/MinIO/Ollama`);
+console.log(`  Requires ast project start to be running for Postgres/MinIO/embeddings`);
 console.log(`\n  Now run: cd dashboard && bun run dev\n`);
 
 export default { port, fetch: app.fetch };

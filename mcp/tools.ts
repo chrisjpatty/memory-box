@@ -17,6 +17,8 @@ import { deleteMemory } from '../tools/delete-memory';
 import { graphQuery } from '../tools/graph-query';
 import { displayMemories } from '../tools/display-memories';
 import { renderMemoryCards, buildDisplayResourceHtml } from './display';
+import { chatModel } from '../lib/models';
+import { publicOrigin } from '../lib/public-url';
 
 const DISPLAY_RESOURCE_URI = 'ui://memory-box/display';
 
@@ -208,10 +210,7 @@ export function registerAllTools(server: McpServer): void {
       const html = renderMemoryCards(memories);
 
       // Pass the dashboard base URL so the iframe can link to memory pages
-      const port = process.env.PORT || '3001';
-      const baseUrl = process.env.PUBLIC_URL
-        || process.env.BASE_URL
-        || `http://localhost:${port}`;
+      const baseUrl = publicOrigin();
 
       return {
         content: [
@@ -260,7 +259,7 @@ export function registerAllTools(server: McpServer): void {
         name: 'Memory Box',
         instructions:
           'You are Memory Box, a personal memory storage and retrieval assistant. Help the user search, store, and explore their memories.',
-        model: 'anthropic/claude-opus-4-6',
+        model: chatModel(),
         tools: {
           storeMemory,
           searchMemories,

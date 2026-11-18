@@ -5,6 +5,7 @@
  * None of these routes require session auth — they sit outside /api/*.
  */
 import { Hono } from 'hono';
+import { publicOrigin } from '../../lib/public-url';
 import {
   registerClient,
   getClient,
@@ -49,23 +50,13 @@ function recordDcrRequest(ip: string): void {
   }
 }
 
-// --- Helper to get origin from request ---
-
-function getOrigin(c: any): string {
-  const url = new URL(c.req.url);
-  // Prefer X-Forwarded headers for proxied setups
-  const proto = c.req.header('x-forwarded-proto') || url.protocol.replace(':', '');
-  const host = c.req.header('x-forwarded-host') || c.req.header('host') || url.host;
-  return `${proto}://${host}`;
-}
-
 // --- Well-known metadata endpoints (mounted at root /) ---
 
 export const oauthWellKnown = new Hono();
 
 // RFC 9728: Protected Resource Metadata
 oauthWellKnown.get('/.well-known/oauth-protected-resource', (c) => {
-  const origin = getOrigin(c);
+  const origin = publicOrigin(c);
   return c.json({
     resource: `${origin}/mcp`,
     authorization_servers: [origin],
@@ -75,7 +66,7 @@ oauthWellKnown.get('/.well-known/oauth-protected-resource', (c) => {
 
 // RFC 8414: Authorization Server Metadata
 oauthWellKnown.get('/.well-known/oauth-authorization-server', (c) => {
-  const origin = getOrigin(c);
+  const origin = publicOrigin(c);
   return c.json({
     issuer: origin,
     authorization_endpoint: `${origin}/oauth/authorize`,

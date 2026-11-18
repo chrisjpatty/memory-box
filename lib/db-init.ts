@@ -1,6 +1,6 @@
 import { readFileSync } from 'fs';
 import { join } from 'path';
-import { getPool } from './db';
+import { connectDatabase, getPool } from './db';
 
 /**
  * Initialize the database schema. Idempotent — safe to call on every startup.
@@ -9,12 +9,11 @@ import { getPool } from './db';
 export async function initDatabase(): Promise<void> {
   const schemaPath = join(import.meta.dir, 'db-schema.sql');
   const schema = readFileSync(schemaPath, 'utf-8');
-  const pool = getPool();
-
   const maxRetries = 15;
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
-      await pool.query(schema);
+      await connectDatabase();
+      await getPool().query(schema);
       return;
     } catch (err: any) {
       if (attempt === maxRetries) throw err;

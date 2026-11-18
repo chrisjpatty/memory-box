@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { validateToken } from '../lib/auth';
 import { ingest } from '../lib/ingest';
+import { query } from '../lib/db';
 import { validateSession } from './session';
 import { auth } from './api/auth';
 import { token } from './api/token';
@@ -36,7 +37,17 @@ export function createApp(options?: AppOptions) {
   }
 
   // Health check
-  app.get('/health', (c) => c.json({ status: 'ok' }));
+  // Used as the platform healthcheck (astropods.yml agent.healthcheck), so
+  // report unhealthy until the database is reachable.
+  app.get('/health', async (c) => {
+    try {
+      await query('SELECT 1');
+      return c.json({ status: 'ok' });
+    } catch (err) {
+      console.error('[health] database check failed:', err);
+      return c.json({ status: 'error', error: 'database unavailable' }, 503);
+    }
+  });
 
   // --- OAuth 2.1 routes (no session auth) ---
   app.route('/', oauthWellKnown);        // /.well-known/* metadata endpoints
