@@ -17,6 +17,8 @@ import { listMemories } from '../tools/list-memories';
 import { deleteMemory } from '../tools/delete-memory';
 import { graphQuery } from '../tools/graph-query';
 import { displayMemories } from '../tools/display-memories';
+import { chatModel } from './models';
+import { getConnectionConfig } from './db';
 
 const AGENT_ID = 'memory-box';
 
@@ -70,8 +72,7 @@ NEVER write out memory details as markdown. Always use display-memories instead.
 - If a search returns no results, suggest alternative queries or let them know the memory box is empty
 - If content was deduplicated on ingest, let the user know it was already stored`;
 
-function resolveOtlpTracesEndpoint(): string {
-  const raw = process.env.OTEL_EXPORTER_OTLP_ENDPOINT || 'http://localhost:4318';
+function resolveOtlpTracesEndpoint(raw: string): string {
   try {
     const url = new URL(raw);
     if (!url.pathname || url.pathname === '/') {
@@ -88,12 +89,9 @@ let _mastra: Mastra | null = null;
 export function createMastra(): Mastra {
   if (_mastra) return _mastra;
 
-  const host = process.env.POSTGRES_HOST || 'localhost';
-  const port = process.env.POSTGRES_PORT || '5432';
-  const db = process.env.POSTGRES_DB || 'memory_box';
-  const user = process.env.POSTGRES_USER || 'postgres';
-  const password = process.env.POSTGRES_PASSWORD || 'postgres';
-  const connectionString = `postgresql://${user}:${password}@${host}:${port}/${db}`;
+  // Same credentials the shared pool resolved at startup (see lib/db.ts).
+  const { host, port, database, user, password } = getConnectionConfig();
+  const connectionString = `postgresql://${encodeURIComponent(String(user))}:${encodeURIComponent(String(password))}@${host}:${port}/${database}`;
 
   const memory = new Memory({
     storage: new PostgresStore({
@@ -106,7 +104,7 @@ export function createMastra(): Mastra {
     id: AGENT_ID,
     name: 'Memory Box',
     instructions: INSTRUCTIONS,
-    model: 'anthropic/claude-opus-4-6',
+    model: chatModel(),
     memory,
     tools: {
       storeMemory,
@@ -119,23 +117,31 @@ export function createMastra(): Mastra {
     },
   });
 
-  const observability = new Observability({
-    configs: {
-      otel: {
-        serviceName: 'memory-box',
-        exporters: [
-          new OtelExporter({
-            provider: {
-              custom: {
-                endpoint: resolveOtlpTracesEndpoint(),
-                protocol: 'http/protobuf',
-              },
-            },
-          }),
-        ],
-      },
-    },
-  });
+  // The platform injects OTEL_EXPORTER_OTLP_ENDPOINT only when deployed;
+  // locally there's no collector, so skip tracing entirely.
+  const otlpEndpoint = process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
+  const observability = otlpEndpoint
+    ? new Observability({
+        configs: {
+          otel: {
+            serviceName: process.env.ASTRO_AGENT_NAME ?? 'memory-box',
+            exporters: [
+              new OtelExporter({
+                provider: {
+                  custom: {
+                    endpoint: resolveOtlpTracesEndpoint(otlpEndpoint),
+                    protocol: 'http/protobuf',
+                  },
+                },
+                resourceAttributes: {
+                  'service.version': process.env.ASTRO_AGENT_BUILD ?? 'dev',
+                },
+              }),
+            ],
+          },
+        },
+      })
+    : undefined;
 
   _mastra = new Mastra({
     agents: {

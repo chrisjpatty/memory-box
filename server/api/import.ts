@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { publicOrigin } from '../../lib/public-url';
 import { saveGitHubToken, getGitHubToken, removeGitHubToken, getTokenInfo } from '../../lib/import/token-store';
 import {
   discoverStars,
@@ -134,9 +135,7 @@ importApi.get('/twitter/status', async (c) => {
 
 importApi.get('/twitter/authorize', async (c) => {
   try {
-    const proto = c.req.header('x-forwarded-proto') || 'http';
-    const host = c.req.header('host') || 'localhost:3001';
-    const callbackUrl = `${proto}://${host}/api/import/twitter/callback`;
+    const callbackUrl = `${publicOrigin(c)}/api/import/twitter/callback`;
 
     const url = await generateAuthUrl(callbackUrl);
     return c.json({ url });
