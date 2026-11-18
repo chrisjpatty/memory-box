@@ -27,6 +27,10 @@ function legacyCredentials(): Credentials {
   return { ...platformCredentials(), database: 'memory_box', user: 'postgres', password: 'postgres' };
 }
 
+// Fail fast instead of waiting indefinitely when the database host is
+// unreachable, so /health can report it and requests don't hang.
+const CONNECTION_TIMEOUT_MS = 5000;
+
 // invalid_password (also returned for a nonexistent role under scram auth)
 // and invalid_authorization_specification ("role does not exist").
 const AUTH_FAILURE_CODES = new Set(['28P01', '28000']);
@@ -34,7 +38,7 @@ const AUTH_FAILURE_CODES = new Set(['28P01', '28000']);
 export type CredentialProbe = (creds: Credentials) => Promise<void>;
 
 async function probeCredentials(creds: Credentials): Promise<void> {
-  const client = new pg.Client(creds);
+  const client = new pg.Client({ ...creds, connectionTimeoutMillis: CONNECTION_TIMEOUT_MS });
   try {
     await client.connect();
   } finally {
@@ -77,17 +81,23 @@ export async function resolveCredentials(probe: CredentialProbe = probeCredentia
 export async function connectDatabase(probe?: CredentialProbe): Promise<void> {
   if (resolvedConfig) return;
   const creds = await resolveCredentials(probe);
-  resolvedConfig = { ...creds, max: 10 };
+  resolvedConfig = { ...creds, max: 10, connectionTimeoutMillis: CONNECTION_TIMEOUT_MS };
 }
 
 /** Connection config for other clients (e.g. Mastra's PostgresStore). */
 export function getConnectionConfig(): pg.PoolConfig {
-  return resolvedConfig ?? { ...platformCredentials(), max: 10 };
+  return resolvedConfig ?? { ...platformCredentials(), max: 10, connectionTimeoutMillis: CONNECTION_TIMEOUT_MS };
 }
 
 export function getPool(): pg.Pool {
   if (!pool) {
     pool = new pg.Pool(getConnectionConfig());
+    // An idle client losing its connection (e.g. Postgres restarting) emits
+    // 'error' on the pool; unhandled, that crashes the process. The pool
+    // already discards the client, so just log it.
+    pool.on('error', (err) => {
+      console.error('[db] idle client error:', err.message);
+    });
   }
   return pool;
 }

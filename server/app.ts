@@ -41,7 +41,12 @@ export function createApp(options?: AppOptions) {
   // report unhealthy until the database is reachable.
   app.get('/health', async (c) => {
     try {
-      await query('SELECT 1');
+      // Answer within the platform healthcheck's 5s timeout even if the
+      // database connection hangs.
+      await Promise.race([
+        query('SELECT 1'),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('timed out after 3s')), 3000)),
+      ]);
       return c.json({ status: 'ok' });
     } catch (err) {
       console.error('[health] database check failed:', err);
