@@ -3,7 +3,7 @@
 .env
 .env.*
 .ast/
-node_modules/
+**/node_modules/
 dist/
 .idea/
 .vscode/
