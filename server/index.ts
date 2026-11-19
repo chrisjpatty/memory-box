@@ -14,4 +14,7 @@ startCleanupJob();
 const port = parseInt(process.env.PORT || '80', 10);
 console.log(`Memory Box server listening on port ${port}`);
 
-export default { port, fetch: app.fetch };
+// Bun closes connections that send nothing for idleTimeout seconds (default
+// 10), which cut off slow requests like ingest. Chat streams also send
+// heartbeats (lib/chat-runs.ts).
+export default { port, fetch: app.fetch, idleTimeout: 120 };

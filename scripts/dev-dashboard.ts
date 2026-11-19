@@ -55,4 +55,7 @@ console.log(`\n  Dashboard API server: http://localhost:${port}`);
 console.log(`  Requires ast project start to be running for Postgres/MinIO/embeddings`);
 console.log(`\n  Now run: cd dashboard && bun run dev\n`);
 
-export default { port, fetch: app.fetch };
+// Bun closes connections that send nothing for idleTimeout seconds (default
+// 10), which cut off slow requests like ingest. Chat streams also send
+// heartbeats (lib/chat-runs.ts).
+export default { port, fetch: app.fetch, idleTimeout: 120 };
