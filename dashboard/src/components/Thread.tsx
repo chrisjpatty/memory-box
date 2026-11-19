@@ -477,8 +477,10 @@ export function Thread({ messages, isLoading, isStreaming, onSend }: ThreadProps
       )}
       <div className="fixed bottom-0 left-0 md:left-56 right-0 px-4 md:px-8 z-10 bg-neutral-950 before:content-[''] before:absolute before:inset-x-0 before:bottom-[calc(100%-0.75rem)] before:h-10 before:bg-gradient-to-t before:from-neutral-950/80 before:to-transparent before:pointer-events-none">
         <div className="max-w-[788px] mx-auto w-full pb-4 px-4">
-        {/* Bottom-edge beam runs only while the assistant is responding */}
-        <BorderBeam size="line" colorVariant="ocean" theme="dark" staticColors strength={0.8} active={isStreaming}>
+        {/* Bottom-edge beam runs only while the assistant is responding. No
+            staticColors here: for the line type, border-beam applies the bloom's
+            blur through its hue-shift animation, so disabling it leaves hard edges. */}
+        <BorderBeam size="line" colorVariant="ocean" theme="dark" strength={0.8} active={isStreaming}>
         <div className="border-glow relative flex items-end backdrop-blur-xl bg-neutral-950/60 rounded-xl">
           <textarea
             ref={textareaRef}
